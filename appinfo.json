@@ -1,0 +1,161 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "dansherbeck",
+    "longName": "Floaty Duck",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "images/menu_icon.png",
+                "menuIcon": true,
+                "name": "MENU",
+                "type": "png"
+            },
+            {
+                "file": "images/9.png",
+                "name": "IMAGE_9",
+                "type": "png"
+            },
+            {
+                "file": "images/8.png",
+                "name": "IMAGE_8",
+                "type": "png"
+            },
+            {
+                "file": "images/7.png",
+                "name": "IMAGE_7",
+                "type": "png"
+            },
+            {
+                "file": "images/6.png",
+                "name": "IMAGE_6",
+                "type": "png"
+            },
+            {
+                "file": "images/5.png",
+                "name": "IMAGE_5",
+                "type": "png"
+            },
+            {
+                "file": "images/4.png",
+                "name": "IMAGE_4",
+                "type": "png"
+            },
+            {
+                "file": "images/3.png",
+                "name": "IMAGE_3",
+                "type": "png"
+            },
+            {
+                "file": "images/2.png",
+                "name": "IMAGE_2",
+                "type": "png"
+            },
+            {
+                "file": "images/1.png",
+                "name": "IMAGE_1",
+                "type": "png"
+            },
+            {
+                "file": "images/duck.png",
+                "name": "IMAGE_DUCK",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_left.png",
+                "name": "IMAGE_DUCK_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_dive.png",
+                "name": "IMAGE_DUCK_DIVE",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_left_15.png",
+                "name": "IMAGE_DUCK_LEFT_15",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_left_30.png",
+                "name": "IMAGE_DUCK_LEFT_30",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_left_45.png",
+                "name": "IMAGE_DUCK_LEFT_45",
+                "type": "png"
+            },
+            {
+                "file": "images/0.png",
+                "name": "IMAGE_0",
+                "type": "png"
+            },
+            {
+                "file": "images/shark.png",
+                "name": "IMAGE_SHARK",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_left.png",
+                "name": "IMAGE_SHARK_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_open1.png",
+                "name": "IMAGE_SHARK_OPEN_1",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_open3.png",
+                "name": "IMAGE_SHARK_OPEN_3",
+                "type": "png"
+            },
+            {
+                "file": "images/turkey.png",
+                "name": "IMAGE_TURKEY",
+                "type": "png"
+            },
+            {
+                "file": "images/turkey_left.png",
+                "name": "IMAGE_TURKEY_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_open5.png",
+                "name": "IMAGE_SHARK_OPEN_5",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_eat1.png",
+                "name": "IMAGE_SHARK_EAT_1",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_eat2.png",
+                "name": "IMAGE_SHARK_EAT_2",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_eat3.png",
+                "name": "IMAGE_SHARK_EAT_3",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_eat4.png",
+                "name": "IMAGE_SHARK_EAT_4",
+                "type": "png"
+            }
+        ]
+    },
+    "shortName": "Floaty Duck",
+    "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
+    "versionCode": 1,
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
