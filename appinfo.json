@@ -9,6 +9,26 @@
     "resources": {
         "media": [
             {
+                "file": "images/shark_open4.png",
+                "name": "IMAGE_SHARK_OPEN_4",
+                "type": "png"
+            },
+            {
+                "file": "images/shark_open2.png",
+                "name": "IMAGE_SHARK_OPEN_2",
+                "type": "png"
+            },
+            {
+                "file": "images/santa_left.png",
+                "name": "IMAGE_SANTA_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/santa.png",
+                "name": "IMAGE_SANTA",
+                "type": "png"
+            },
+            {
                 "file": "images/menu_icon.png",
                 "menuIcon": true,
                 "name": "MENU",
@@ -154,7 +174,7 @@
     "shortName": "Floaty Duck",
     "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
     "versionCode": 1,
-    "versionLabel": "1.0",
+    "versionLabel": "1.1",
     "watchapp": {
         "watchface": true
     }

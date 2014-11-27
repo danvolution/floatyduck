@@ -9,6 +9,7 @@
 #include "duck_layer.h"
 #include "bubble_layer.h"
 #include "shark_layer.h"
+#include "santa_layer.h"
   
 #ifdef RUN_TEST
 #include "test_unit.h"
@@ -22,6 +23,7 @@ static WavesLayerData* _wavesData = NULL;
 static DuckLayerData* _duckData = NULL;
 static BubbleLayerData* _bubbleData = NULL;
 static SharkLayerData* _sharkData = NULL;
+static SantaLayerData* _santaData = NULL;
 
 #ifdef RUN_TEST
 static TestUnitData* _testUnitData = NULL;
@@ -35,7 +37,7 @@ static void main_window_load(Window *window);
 static void main_window_unload(Window *window);
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed);
 static void drawWatchFace();
-static void drawScene(SCENE scene, uint16_t hour, uint16_t minute);
+static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second);
 static SCENE getScene(struct tm* now);
 static void switchScene(SCENE scene);
 
@@ -72,6 +74,8 @@ static void init() {
 }
 
 static void deinit() {
+  animation_unschedule_all();
+
 #ifdef RUN_TEST
   if (_testUnitData != NULL) {
     DestroyTestUnit(_testUnitData);
@@ -98,6 +102,11 @@ static void main_window_load(Window *window) {
 }
 
 static void main_window_unload(Window *window) {
+  if (_santaData != NULL) {
+    DestroySantaLayer(_santaData);    
+    _santaData = NULL;
+  }
+
   if (_sharkData != NULL) {
     DestroySharkLayer(_sharkData);    
     _sharkData = NULL;
@@ -140,6 +149,7 @@ static void drawWatchFace() {
   struct tm* localNow = localtime(&now);
   uint16_t hour = localNow->tm_hour;
   uint16_t minute = localNow->tm_min;
+  uint16_t second = localNow->tm_sec;
 
   SCENE scene = getScene(localNow);
   if (scene != _scene) {
@@ -151,10 +161,10 @@ static void drawWatchFace() {
   DrawWaterLayer(_waterData, hour, minute);
   DrawWavesLayer(_wavesData, hour, minute);
   
-  drawScene(scene, hour, minute);
+  drawScene(scene, hour, minute, second);
 }
 
-static void drawScene(SCENE scene, uint16_t hour, uint16_t minute) {
+static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second) {
   if (_duckData != NULL) {
     DrawDuckLayer(_duckData, hour, minute);
   }
@@ -164,7 +174,11 @@ static void drawScene(SCENE scene, uint16_t hour, uint16_t minute) {
   }
   
   if (_sharkData != NULL) {
-    DrawSharkLayer(_sharkData, hour, minute);
+    DrawSharkLayer(_sharkData, hour, minute, second);
+  }
+  
+  if (_santaData != NULL) {
+    DrawSantaLayer(_santaData, hour, minute);
   }
 }
 
@@ -172,8 +186,15 @@ static void switchScene(SCENE scene) {
   bool duckLayer = false;
   bool bubbleLayer = false;
   bool sharkLayer = false;
+  bool santaLayer = false;
   
   switch (scene) {
+    case CHRISTMAS:
+      santaLayer = true;
+      duckLayer = true;
+      bubbleLayer = true;
+      break;
+    
     case DUCK:
       duckLayer = true;
       bubbleLayer = true;
@@ -191,6 +212,8 @@ static void switchScene(SCENE scene) {
     default:
       break;
   }
+
+  animation_unschedule_all();
   
   if (duckLayer == true) {
     if (_duckData == NULL) {
@@ -213,18 +236,29 @@ static void switchScene(SCENE scene) {
   }
   
   if (sharkLayer == true && _sharkData == NULL) {
-    _sharkData = CreateSharkLayer((Layer*) _waterData->inverterLayer, BELOW_SIBLING);
+    _sharkData = CreateSharkLayer((Layer*) _waterData->inverterLayer, BELOW_SIBLING, _duckData);
     
   } else if (sharkLayer == false && _sharkData != NULL) {
     DestroySharkLayer(_sharkData);
     _sharkData = NULL;
   }
   
+  if (santaLayer == true && _santaData == NULL) {
+    _santaData = CreateSantaLayer((Layer*) _waterData->inverterLayer, BELOW_SIBLING);
+    
+  } else if (santaLayer == false && _santaData != NULL) {
+    DestroySantaLayer(_santaData);
+    _santaData = NULL;
+  }
+  
   _scene = scene;
 }
 
 static SCENE getScene(struct tm* now) {
-  if (now->tm_wday == 5 && now->tm_mday == 13) {
+  if (now->tm_mon == 11 && now->tm_mday == 25) {
+    return CHRISTMAS;
+    
+  } else if (now->tm_wday == 5 && now->tm_mday == 13) {
     return FRIDAY13;
     
   } else if (now->tm_mon == 10 && now->tm_wday == 4 && (now->tm_mday >= 22 && now->tm_mday <= 28)) {

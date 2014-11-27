@@ -67,7 +67,9 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute) {
   layer_set_frame((Layer*) data->duck.layer, duckFrame);    
   layer_set_bounds((Layer*) data->duck.layer, GRect(0, 0, duckFrame.size.w, duckFrame.size.h));
 
-  if (data->hidden == true) {
+  // The shark layer controls the duck visibility during the SHARK_SCENE_EAT_MINUTE minute.
+  bool sharkSceneControl = (data->scene == FRIDAY13 && minute == SHARK_SCENE_EAT_MINUTE);
+  if (data->hidden == true && sharkSceneControl == false) {
     layer_set_hidden((Layer*) data->duck.layer, false);
     data->hidden = false;
   }
@@ -94,7 +96,12 @@ static int16_t getDuckCoordinateX(uint16_t minute, SCENE scene) {
   uint16_t position = getHorizontalPosition(minute);
   
   switch (scene) {
-    case DUCK:
+    case FRIDAY13:
+    case THANKSGIVING:
+      xCoordinate = _duckCoordinateX[position];
+      break;
+    
+    default:
       if (minute < BEGIN_PREPARE_DIVE_MINUTE) {
         xCoordinate = _duckCoordinateX[position];
         
@@ -102,14 +109,6 @@ static int16_t getDuckCoordinateX(uint16_t minute, SCENE scene) {
         xCoordinate = _duckDiveCoordinateX[minute - BEGIN_PREPARE_DIVE_MINUTE];
       }
     
-      break;
-    
-    case FRIDAY13:
-    case THANKSGIVING:
-      xCoordinate = _duckCoordinateX[position];
-      break;
-    
-    default:
       break;
   }
       
@@ -121,23 +120,20 @@ static int16_t getDuckCoordinateY(uint16_t minute, int16_t imageHeight, SCENE sc
   int16_t yWaveOffset = getWaveOffsetY(minute);
   
   switch (scene) {
-    case DUCK:
-      if (minute < BEGIN_PREPARE_DIVE_MINUTE) {
-        yCoordinate = WATER_TOP(minute) - WAVE_HEIGHT - imageHeight + yWaveOffset;
-        
-      } else {
-        yCoordinate = _duckDiveCoordinateY[minute - BEGIN_PREPARE_DIVE_MINUTE] - imageHeight;
-      }
-        
-      break;
-    
     case FRIDAY13:
     case THANKSGIVING:
       yCoordinate = WATER_TOP(minute) - WAVE_HEIGHT - imageHeight + yWaveOffset;
       break;
     
     default:
-      break;
+      if (minute < BEGIN_PREPARE_DIVE_MINUTE) {
+        yCoordinate = WATER_TOP(minute) - WAVE_HEIGHT - imageHeight + yWaveOffset;
+        
+      } else {
+        yCoordinate = _duckDiveCoordinateY[minute - BEGIN_PREPARE_DIVE_MINUTE] - imageHeight;
+      }
+
+    break;
   }
     
   return yCoordinate;
@@ -153,19 +149,6 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
   uint32_t resourceId = 0;
   
   switch (scene) {
-    case DUCK:
-      if (minute >= BEGIN_PREPARE_DIVE_MINUTE) {
-        resourceId = _duckDiveResourceId[minute - BEGIN_PREPARE_DIVE_MINUTE];
-        
-      } else if (isMovingRight(minute)) {
-        resourceId = RESOURCE_ID_IMAGE_DUCK;
-        
-      } else {
-        resourceId = RESOURCE_ID_IMAGE_DUCK_LEFT;
-      }
-      
-      break;
-    
     case FRIDAY13:
       if (minute >= SHARK_SCENE_HIDE_DUCK_MINUTE) {
         resourceId = 0;
@@ -190,6 +173,16 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
       break;
     
     default:
+      if (minute >= BEGIN_PREPARE_DIVE_MINUTE) {
+        resourceId = _duckDiveResourceId[minute - BEGIN_PREPARE_DIVE_MINUTE];
+        
+      } else if (isMovingRight(minute)) {
+        resourceId = RESOURCE_ID_IMAGE_DUCK;
+        
+      } else {
+        resourceId = RESOURCE_ID_IMAGE_DUCK_LEFT;
+      }
+      
       break;
   }
   

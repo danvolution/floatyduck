@@ -1,7 +1,18 @@
 #include <pebble.h>
 #include "test_unit.h"
 
-#define TEST_COUNT 3
+#define DEC_24_2014_23_45_00 1419464700
+#define DEC_24_2014_23_55_00 1419465300
+  
+#define FEB_12_2015_23_45_00 1423784700
+#define FEB_12_2015_23_55_00 1423785300
+  
+#define NOV_26_2014_23_45_00 1417045500
+#define NOV_26_2014_23_55_00 1417046100
+  
+#define JAN_01_2015_00_00_00 1420070400
+  
+#define TEST_COUNT 26
 
 typedef struct {
   time_t startTime;
@@ -15,21 +26,95 @@ TestUnitData* CreateTestUnit() {
   TestUnitData* data = malloc(sizeof(TestUnitData));
   if (data != NULL) {
     memset(data, 0, sizeof(TestUnitData));
-
+        
     // Friday the 13th
-    _testData[0].startTime = 1423784700; // Feb 12, 2015 23:45:00 GMT
-    _testData[0].stepSeconds = 60;
-    _testData[0].stepCount = 90;
+    uint16_t testIndex = 0;
+    
+    // Run up to minute 19
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00;
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 24;
+    testIndex++;
+    
+    // Pause at minute 19.
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (24 * 60);
+    _testData[testIndex].stepSeconds = 1;
+    _testData[testIndex].stepCount = 8;
+    testIndex++;
+    
+    // Run up to minute 30
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (25 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 10;
+    testIndex++;
+    
+    // Pause at minute 30
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (35 * 60);
+    _testData[testIndex].stepSeconds = 1;
+    _testData[testIndex].stepCount = 8;
+    testIndex++;
+    
+    // Run up to minute 41
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (36 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 10;
+    testIndex++;
+    
+    // Pause at minute 41
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (46 * 60);
+    _testData[testIndex].stepSeconds = 1;
+    _testData[testIndex].stepCount = 8;
+    testIndex++;
+    
+    // Run up to minute 51
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (47 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 9;
+    testIndex++;
+
+    // Pause at eat minute to let animation run.
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (56 * 60) + 44;
+    _testData[testIndex].stepSeconds = 1;
+    _testData[testIndex].stepCount = 15;
+    testIndex++;
+    
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (57 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 13;
+    testIndex++;
+
+    // Christmas
+    
+    // Increment by 5 minutes and then effectively pause for 10 seconds to let
+    // animation run.
+    for (int index = 0; index < 7; index++) {
+      _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (5 * index * 60);
+      _testData[testIndex].stepSeconds = 60;
+      _testData[testIndex].stepCount = 5;
+      testIndex++;
+  
+      _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (5 * (index + 1) * 60);
+      _testData[testIndex].stepSeconds = 1;
+      _testData[testIndex].stepCount = 10;
+      testIndex++;
+    }
+    
+    _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (35 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 35;
+    testIndex++;
     
     // Thanksgiving
-    _testData[1].startTime = 1417045500; // Nov 26, 2014 23:45:00 GMT
-    _testData[1].stepSeconds = 60;
-    _testData[1].stepCount = 90;
+    _testData[testIndex].startTime = NOV_26_2014_23_55_00;
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 70;
+    testIndex++;
     
     // Normal. Increment by 61 minutes so hour and minute changes.
-    _testData[2].startTime = 1420070400; // Jan 1, 2015 00:00:00 GMT
-    _testData[2].stepSeconds = 3660;
-    _testData[2].stepCount = 60;
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00;
+    _testData[testIndex].stepSeconds = 3660;
+    _testData[testIndex].stepCount = 60;
+    testIndex++;
   }
   
   return data;

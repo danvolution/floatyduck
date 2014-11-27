@@ -5,12 +5,13 @@
  
 #define WAVE_HEIGHT 4
 #define WAVE_COUNT 4
+#define SHARK_SCENE_EAT_MINUTE 51
 
 // Convert from minute to Y coordinate
 #define WATER_TOP(minute) (SCREEN_HEIGHT - (minute * 14 / 5))
 
 typedef enum { CHILD, ABOVE_SIBLING, BELOW_SIBLING } LayerRelation;
-typedef enum { UNDEFINED, DUCK, FRIDAY13, THANKSGIVING } SCENE;
+typedef enum { UNDEFINED, CHRISTMAS, DUCK, FRIDAY13, THANKSGIVING } SCENE;
 
 typedef struct {
   BitmapLayer* layer;
