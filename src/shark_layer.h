@@ -6,6 +6,7 @@ typedef struct {
   BitmapGroup shark;
   DuckLayerData* duckData;
   bool hidden;
+  int16_t lastUpdateMinute;
 } SharkLayerData;
 
 SharkLayerData* CreateSharkLayer(Layer* relativeLayer, LayerRelation relation, DuckLayerData* duckData);

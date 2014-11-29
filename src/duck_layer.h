@@ -5,6 +5,7 @@ typedef struct {
   BitmapGroup duck;
   SCENE scene;
   bool hidden;
+  int16_t lastUpdateMinute;
 } DuckLayerData;
 
 DuckLayerData* CreateDuckLayer(Layer* relativeLayer, LayerRelation relation, SCENE scene);

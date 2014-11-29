@@ -36,12 +36,20 @@ SantaLayerData* CreateSantaLayer(Layer* relativeLayer, LayerRelation relation) {
     data->santa.layer = bitmap_layer_create(GRect(0, -5, 5, 5));
     bitmap_layer_set_compositing_mode(data->santa.layer, GCompOpAnd);
     AddLayer(relativeLayer, (Layer*) data->santa.layer, relation);    
+    data->lastUpdateMinute = -1;
   }
   
   return data;
 }
 
 void DrawSantaLayer(SantaLayerData* data, uint16_t hour, uint16_t minute) {  
+  // Exit if this minute has already been drawn.
+  if (data->lastUpdateMinute == minute) {
+    return;
+  }
+  
+  data->lastUpdateMinute = minute;
+  
   if (_animation != NULL) {
     return;
   }

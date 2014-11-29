@@ -19,12 +19,15 @@ static Bubble _bubbles[BUBBLE_CLUSTERS][BUBBLES_PER_CLUSTER] = {
 };
 
 static uint16_t _currentMinute = 0;
+static AppTimer *_timer = NULL;
 
 static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx);
+static void timerCallback(void *callback_data);
 
 BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation) {
   BubbleLayerData* data = malloc(sizeof(BubbleLayerData));
   if (data != NULL) {
+    memset(data, 0, sizeof(BubbleLayerData));
     data->layer = layer_create(GRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
     layer_set_update_proc(data->layer, bubbleLayerUpdateProc);
     AddLayer(relativeLayer, data->layer, relation);
@@ -34,11 +37,23 @@ BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation)
 }
 
 void DrawBubbleLayer(BubbleLayerData* data, uint16_t hour, uint16_t minute) {
-  _currentMinute = minute;
-  layer_mark_dirty(data->layer);
+  if (minute < BEGIN_BUBBLES_MINUTE) {
+    _currentMinute = minute;
+    layer_mark_dirty(data->layer);  
+    return;
+  }
+  
+  // Delay layer update by the water rise animation duration.
+  data->nextMinute = minute;
+  _timer = app_timer_register(WATER_RISE_DURATION, (AppTimerCallback) timerCallback, (void*) data);
 }
 
 void DestroyBubbleLayer(BubbleLayerData* data) {
+  if (_timer != NULL) {
+    app_timer_cancel(_timer);
+    _timer = NULL;
+  }
+  
   if (data != NULL) {
     if (data->layer != NULL) {
       layer_destroy(data->layer);
@@ -62,4 +77,11 @@ static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx) {
                            _bubbles[minute - BEGIN_BUBBLES_MINUTE][bubble].size);
     }
   }
+}
+
+static void timerCallback(void *callback_data) {
+  _timer = NULL;
+  BubbleLayerData *data = (BubbleLayerData*) callback_data;
+  _currentMinute = data->nextMinute;
+  layer_mark_dirty(data->layer);  
 }

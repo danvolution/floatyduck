@@ -3,6 +3,7 @@
   
 typedef struct {
   BitmapGroup santa;
+  int16_t lastUpdateMinute;
 } SantaLayerData;
 
 SantaLayerData* CreateSantaLayer(Layer* relativeLayer, LayerRelation relation);

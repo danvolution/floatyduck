@@ -3,6 +3,7 @@
   
 typedef struct {
   Layer* layer;
+  uint16_t nextMinute;
 } BubbleLayerData;
 
 BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation);

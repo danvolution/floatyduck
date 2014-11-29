@@ -4,6 +4,7 @@
 typedef struct {
   Layer* layer;
   InverterLayer* childInverterLayers[WAVE_HEIGHT * WAVE_COUNT];
+  int16_t lastUpdateMinute;
 } WavesLayerData;
 
 WavesLayerData* CreateWavesLayer(Layer* relativeLayer, LayerRelation relation);

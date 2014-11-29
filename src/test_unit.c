@@ -1,15 +1,9 @@
 #include <pebble.h>
 #include "test_unit.h"
 
-#define DEC_24_2014_23_45_00 1419464700
 #define DEC_24_2014_23_55_00 1419465300
-  
-#define FEB_12_2015_23_45_00 1423784700
 #define FEB_12_2015_23_55_00 1423785300
-  
-#define NOV_26_2014_23_45_00 1417045500
 #define NOV_26_2014_23_55_00 1417046100
-  
 #define JAN_01_2015_00_00_00 1420070400
   
 #define TEST_COUNT 26
@@ -73,7 +67,7 @@ TestUnitData* CreateTestUnit() {
     testIndex++;
 
     // Pause at eat minute to let animation run.
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (56 * 60) + 44;
+    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (56 * 60);
     _testData[testIndex].stepSeconds = 1;
     _testData[testIndex].stepCount = 15;
     testIndex++;

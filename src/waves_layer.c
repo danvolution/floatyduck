@@ -12,6 +12,9 @@ static GRect _waveRows[WAVE_HEIGHT] = {
   { {0, 3}, {28, 1} }
 };
 
+static PropertyAnimation* _animation = NULL;
+
+static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 static GRect offsetRect(GRect* rect, int16_t x, int16_t y);
 
 WavesLayerData* CreateWavesLayer(Layer* relativeLayer, LayerRelation relation) {
@@ -30,13 +33,38 @@ WavesLayerData* CreateWavesLayer(Layer* relativeLayer, LayerRelation relation) {
     }
   
     AddLayer(relativeLayer, data->layer, relation);
+    data->lastUpdateMinute = -1;
   }
   
   return data;
 }
 
 void DrawWavesLayer(WavesLayerData* data, uint16_t hour, uint16_t minute) {
-  layer_set_frame(data->layer, GRect(0, WATER_TOP(minute) - WAVE_HEIGHT, SCREEN_WIDTH, WAVE_HEIGHT));    
+  // Exit if this minute has already been handled.
+  if (data->lastUpdateMinute == minute) {
+    return;
+  }
+  
+  // Remember whether first time called.
+  bool firstDisplay = (data->lastUpdateMinute == -1); 
+  data->lastUpdateMinute = minute;
+  GRect newFrame = GRect(0, WATER_TOP(minute) - WAVE_HEIGHT, SCREEN_WIDTH, WAVE_HEIGHT);
+  
+  if (minute == 0 || firstDisplay) {
+    layer_set_frame(data->layer, newFrame);
+
+  } else if (_animation == NULL) {
+    // Create the animation and schedule it.
+    _animation = property_animation_create_layer_frame((Layer*) data->layer, NULL, &newFrame);
+    animation_set_duration((Animation*) _animation, WATER_RISE_DURATION);
+    animation_set_curve((Animation*) _animation, AnimationCurveLinear);
+    animation_set_handlers((Animation*) _animation, (AnimationHandlers) {
+      .started = NULL,
+      .stopped = (AnimationStoppedHandler) animationStoppedHandler,
+    }, NULL);
+
+    animation_schedule((Animation*) _animation);
+  }
 }
 
 void DestroyWavesLayer(WavesLayerData* data) {
@@ -63,4 +91,9 @@ void DestroyWavesLayer(WavesLayerData* data) {
 // Returns: A new GRect offset by x and y.
 static GRect offsetRect(GRect* rect, int16_t x, int16_t y) {
   return GRect(rect->origin.x + x, rect->origin.y + y, rect->size.w, rect->size.h);
+}
+
+static void animationStoppedHandler(Animation *animation, bool finished, void *context) {
+  property_animation_destroy(_animation);
+  _animation = NULL;
 }

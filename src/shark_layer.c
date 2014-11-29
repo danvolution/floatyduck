@@ -56,10 +56,12 @@ static SharkAnimation _sharkPass[SHARK_PASS_COUNT] = {
 static PropertyAnimation* _animation = NULL;
 static SharkAnimationType _animationType = SHARK_UNDEFINED;
 static uint16_t _eatAnimationIndex = 0;
-
+static AppTimer *_eatTimer = NULL;
+  
 static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation);
 static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
+static void eatTimerCallback(void *callback_data);
 
 SharkLayerData* CreateSharkLayer(Layer* relativeLayer, LayerRelation relation, DuckLayerData* duckData) {
   SharkLayerData* data = malloc(sizeof(SharkLayerData));
@@ -69,6 +71,7 @@ SharkLayerData* CreateSharkLayer(Layer* relativeLayer, LayerRelation relation, D
     bitmap_layer_set_compositing_mode(data->shark.layer, GCompOpAnd);
     AddLayer(relativeLayer, (Layer*) data->shark.layer, relation);    
     data->hidden = false;
+    data->lastUpdateMinute = -1;
     data->duckData = duckData;
   }
   
@@ -76,11 +79,17 @@ SharkLayerData* CreateSharkLayer(Layer* relativeLayer, LayerRelation relation, D
 }
 
 void DrawSharkLayer(SharkLayerData* data, uint16_t hour, uint16_t minute, uint16_t second) {
-  SharkAnimation* sharkAnimation = getSharkAnimation(minute, second);
+  // Exit if this minute has already been handled.
+  if (data->lastUpdateMinute == minute) {
+    return;
+  }
+    
+  data->lastUpdateMinute = minute;
   
+  SharkAnimation* sharkAnimation = getSharkAnimation(minute, second);
   if (sharkAnimation != NULL && _animation == NULL) {
     if (sharkAnimation->type == SHARK_EAT) {
-      _eatAnimationIndex = 1;
+      _eatAnimationIndex = 0;
     }
 	
     if (data->hidden == true) {
@@ -127,19 +136,21 @@ static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation) {
   GRect stopFrame = (GRect) { .origin = sharkAnimation->endPoint, .size = data->shark.bitmap->bounds.size };
   
   layer_set_frame((Layer*) data->shark.layer, startFrame);    
-  layer_set_bounds((Layer*) data->shark.layer, GRect(0, 0, startFrame.size.w, startFrame.size.h));    
+  layer_set_bounds((Layer*) data->shark.layer, GRect(0, 0, startFrame.size.w, startFrame.size.h));
   
   // Create the animation and schedule it.
   _animation = property_animation_create_layer_frame((Layer*) data->shark.layer, NULL, &stopFrame);
-  animation_set_duration((Animation*) _animation, sharkAnimation->duration);
-  animation_set_curve((Animation*) _animation, AnimationCurveLinear);
-  animation_set_handlers((Animation*) _animation, (AnimationHandlers) {
-    .started = NULL,
-    .stopped = (AnimationStoppedHandler) animationStoppedHandler,
-  }, (void*) data);
 
-  _animationType = sharkAnimation->type;  
-  animation_schedule((Animation*) _animation);
+  if (_animation != NULL) {
+    animation_set_duration((Animation*) _animation, sharkAnimation->duration);
+    animation_set_curve((Animation*) _animation, AnimationCurveLinear);
+    animation_set_handlers((Animation*) _animation, (AnimationHandlers) {
+      .started = NULL,
+      .stopped = (AnimationStoppedHandler) animationStoppedHandler,
+    }, (void*) data);
+    _animationType = sharkAnimation->type;  
+    animation_schedule((Animation*) _animation);
+  }
 }
 
 static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second) {
@@ -162,18 +173,27 @@ static void animationStoppedHandler(Animation *animation, bool finished, void *c
   property_animation_destroy(_animation);
   _animation = NULL;
   
-  if (finished && _animationType == SHARK_EAT && _eatAnimationIndex < SHARK_EAT_COUNT) {
-    SharkLayerData* data = (SharkLayerData*) context;
-    if (data->duckData->hidden == true && _eatAnimationIndex < EAT_ANIMATION_HIDE_DUCK_INDEX) {
-      layer_set_hidden((Layer*) data->duckData->duck.layer, false);
-      data->duckData->hidden = false;
-	  
-    } else if (data->duckData->hidden == false && _eatAnimationIndex >= EAT_ANIMATION_HIDE_DUCK_INDEX) {
-      layer_set_hidden((Layer*) data->duckData->duck.layer, true);
-      data->duckData->hidden = true;	
-	  }
-
-    runAnimation((SharkLayerData*) context, &_sharkEat[_eatAnimationIndex]);
+  if (finished && _animationType == SHARK_EAT && (_eatAnimationIndex + 1) < SHARK_EAT_COUNT) {
+    // Work-around to crash in the Pebble animation_schedule() function in runAnimation().
+    // Schedule a timer to run the next animation.
     _eatAnimationIndex++;
+    _eatTimer = app_timer_register(10, (AppTimerCallback) eatTimerCallback, context);
   }
+}
+
+static void eatTimerCallback(void *callback_data) {
+  _eatTimer = NULL;
+  SharkLayerData* data = (SharkLayerData*) callback_data;
+
+  // The shark layer is responsible for showing/hiding the duck layer in minute SHARK_SCENE_EAT_MINUTE.
+  if (data->duckData->hidden == true && _eatAnimationIndex < EAT_ANIMATION_HIDE_DUCK_INDEX) {
+    layer_set_hidden((Layer*) data->duckData->duck.layer, false);
+    data->duckData->hidden = false;
+
+  } else if (data->duckData->hidden == false && _eatAnimationIndex >= EAT_ANIMATION_HIDE_DUCK_INDEX) {
+    layer_set_hidden((Layer*) data->duckData->duck.layer, true);
+    data->duckData->hidden = true;	
+  }
+
+  runAnimation(data, &_sharkEat[_eatAnimationIndex]);
 }
