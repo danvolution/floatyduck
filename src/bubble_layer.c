@@ -11,7 +11,7 @@ typedef struct {
 } Bubble;
 
 static Bubble _bubbles[BUBBLE_CLUSTERS][BUBBLES_PER_CLUSTER] = {
-  { {{36, 21}, 1}, {{41, 21}, 2}, {{33, 29}, 1} },
+  { {{38, 21}, 1}, {{43, 21}, 2}, {{35, 29}, 1} },
   { {{34, 41}, 1}, {{29, 43}, 2}, {{34, 58}, 1} },
   { {{28, 65}, 2}, {{28, 70}, 1}, {{32, 88}, 1} },
   { {{23, 101}, 1}, {{26, 103}, 1}, {{25, 114}, 1} },
@@ -31,13 +31,23 @@ BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation)
     data->layer = layer_create(GRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
     layer_set_update_proc(data->layer, bubbleLayerUpdateProc);
     AddLayer(relativeLayer, data->layer, relation);
+    data->lastUpdateMinute = -1;
   }
   
   return data;
 }
 
 void DrawBubbleLayer(BubbleLayerData* data, uint16_t hour, uint16_t minute) {
-  if (minute < BEGIN_BUBBLES_MINUTE) {
+  // Exit if this minute has already been handled.
+  if (data->lastUpdateMinute == minute) {
+    return;
+  }
+  
+  // Remember whether first time called.
+  bool firstDisplay = (data->lastUpdateMinute == -1); 
+  data->lastUpdateMinute = minute;
+
+  if (minute < BEGIN_BUBBLES_MINUTE || firstDisplay) {
     _currentMinute = minute;
     layer_mark_dirty(data->layer);  
     return;

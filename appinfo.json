@@ -95,21 +95,6 @@
                 "type": "png"
             },
             {
-                "file": "images/duck_left_15.png",
-                "name": "IMAGE_DUCK_LEFT_15",
-                "type": "png"
-            },
-            {
-                "file": "images/duck_left_30.png",
-                "name": "IMAGE_DUCK_LEFT_30",
-                "type": "png"
-            },
-            {
-                "file": "images/duck_left_45.png",
-                "name": "IMAGE_DUCK_LEFT_45",
-                "type": "png"
-            },
-            {
                 "file": "images/0.png",
                 "name": "IMAGE_0",
                 "type": "png"
@@ -174,7 +159,7 @@
     "shortName": "Floaty Duck",
     "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
     "versionCode": 1,
-    "versionLabel": "1.1",
+    "versionLabel": "1.2",
     "watchapp": {
         "watchface": true
     }

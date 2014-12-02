@@ -92,16 +92,11 @@ void DrawSharkLayer(SharkLayerData* data, uint16_t hour, uint16_t minute, uint16
       _eatAnimationIndex = 0;
     }
 	
-    if (data->hidden == true) {
-      layer_set_hidden((Layer*) data->shark.layer, false);
-      data->hidden = false;
-    }
-    
+    SetLayerHidden((Layer*) data->shark.layer, &data->hidden, false);
     runAnimation(data, sharkAnimation);
 	
-  } else if (_animation == NULL && data->hidden == false) {
-      layer_set_hidden((Layer*) data->shark.layer, true);
-      data->hidden = true;
+  } else if (_animation == NULL) {
+    SetLayerHidden((Layer*) data->shark.layer, &data->hidden, true);
   }
   
   // The duck layer is showing if watchface was loaded between 53:45 and 53:59, so hide it if
@@ -119,18 +114,8 @@ void DestroySharkLayer(SharkLayerData* data) {
   }  
 }
 
-static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation) {  
-  if (data->shark.resourceId != sharkAnimation->resourceId) {
-    if (data->shark.bitmap != NULL) {
-      gbitmap_destroy(data->shark.bitmap);
-      data->shark.bitmap = NULL;
-      data->shark.resourceId = 0;
-    }
-    
-    data->shark.bitmap = gbitmap_create_with_resource(sharkAnimation->resourceId);
-    data->shark.resourceId = sharkAnimation->resourceId;
-    bitmap_layer_set_bitmap(data->shark.layer, data->shark.bitmap);
-  }
+static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation) {
+  BitmapGroupSetBitmap(&data->shark, sharkAnimation->resourceId);
 
   GRect startFrame = (GRect) { .origin = sharkAnimation->startPoint, .size = data->shark.bitmap->bounds.size };
   GRect stopFrame = (GRect) { .origin = sharkAnimation->endPoint, .size = data->shark.bitmap->bounds.size };
@@ -186,14 +171,8 @@ static void eatTimerCallback(void *callback_data) {
   SharkLayerData* data = (SharkLayerData*) callback_data;
 
   // The shark layer is responsible for showing/hiding the duck layer in minute SHARK_SCENE_EAT_MINUTE.
-  if (data->duckData->hidden == true && _eatAnimationIndex < EAT_ANIMATION_HIDE_DUCK_INDEX) {
-    layer_set_hidden((Layer*) data->duckData->duck.layer, false);
-    data->duckData->hidden = false;
-
-  } else if (data->duckData->hidden == false && _eatAnimationIndex >= EAT_ANIMATION_HIDE_DUCK_INDEX) {
-    layer_set_hidden((Layer*) data->duckData->duck.layer, true);
-    data->duckData->hidden = true;	
-  }
-
+  SetLayerHidden((Layer*) data->duckData->duck.layer, &data->duckData->hidden, 
+                 (_eatAnimationIndex >= EAT_ANIMATION_HIDE_DUCK_INDEX));
+                 
   runAnimation(data, &_sharkEat[_eatAnimationIndex]);
 }

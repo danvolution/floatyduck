@@ -50,6 +50,7 @@ void DrawSantaLayer(SantaLayerData* data, uint16_t hour, uint16_t minute) {
   
   data->lastUpdateMinute = minute;
   
+  // Exit if animation already running
   if (_animation != NULL) {
     return;
   }
@@ -60,17 +61,7 @@ void DrawSantaLayer(SantaLayerData* data, uint16_t hour, uint16_t minute) {
   }
 
   uint32_t santaResourceId = pass->leftToRight ? RESOURCE_ID_IMAGE_SANTA : RESOURCE_ID_IMAGE_SANTA_LEFT;
-  if (data->santa.resourceId != santaResourceId) {
-    if (data->santa.bitmap != NULL) {
-      gbitmap_destroy(data->santa.bitmap);
-      data->santa.bitmap = NULL;
-      data->santa.resourceId = 0;
-    }
-    
-    data->santa.bitmap = gbitmap_create_with_resource(santaResourceId);
-    data->santa.resourceId = santaResourceId;
-    bitmap_layer_set_bitmap(data->santa.layer, data->santa.bitmap);
-  }
+  BitmapGroupSetBitmap(&data->santa, santaResourceId);
 
   GRect startFrame = getSantaStartFrame(pass, data->santa.bitmap->bounds.size.w, data->santa.bitmap->bounds.size.h);
   GRect stopFrame = getSantaStopFrame(pass, data->santa.bitmap->bounds.size.w, data->santa.bitmap->bounds.size.h);

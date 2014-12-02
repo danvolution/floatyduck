@@ -2,7 +2,7 @@
 #include "common.h"
   
 typedef struct {
-  BitmapGroup duck;
+  RotBitmapGroup duck;
   SCENE scene;
   bool hidden;
   int16_t lastUpdateMinute;

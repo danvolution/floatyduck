@@ -3,25 +3,27 @@
 
 #define HORIZONTAL_POSITIONS 15
 #define DIVE_POSITIONS 7
-#define BEGIN_PREPARE_DIVE_MINUTE 53
-#define BEGIN_DIVE_MINUTE 56
+#define BEGIN_DIVE_MINUTE 53
 #define SHARK_SCENE_HIDE_DUCK_MINUTE 52
+// Milliseconds between each rotation increment when duck is starting dive.
+#define ROTATION_INCREMENT_DURATION 40
+
+typedef struct {
+  int32_t startAngle;
+  int32_t endAngle;
+} RotationAnimation;
 
 static int16_t _duckCoordinateX[HORIZONTAL_POSITIONS] = { 17, 25, 32, 40, 48, 56, 63, 71, 79, 86, 94, 102, 110, 117, 125 };
 static int16_t _duckDiveCoordinateX[DIVE_POSITIONS] = { 63, 56, 50, 44, 38, 32, 28 };
-static int16_t _duckDiveCoordinateY[DIVE_POSITIONS] = { 26, 34, 44, 75, 100, 135, 180 };
+static int16_t _duckDiveCoordinateY[DIVE_POSITIONS] = { 35, 55, 65, 75, 100, 135, 180 };
 
 // Pixels to offset the duck in the positive Y direction to make the duck look like
 // it is comfortably sitting on the wave.
 static int16_t _waveOffsetY[HORIZONTAL_POSITIONS] = { 1, 1, 4, 3, 1, 1, 2, 4, 2, 1, 1, 3, 4, 2, 1 };
 
-static int16_t _duckDiveResourceId[DIVE_POSITIONS] = { 
-  RESOURCE_ID_IMAGE_DUCK_LEFT_15, RESOURCE_ID_IMAGE_DUCK_LEFT_30, RESOURCE_ID_IMAGE_DUCK_LEFT_45, 
-  RESOURCE_ID_IMAGE_DUCK_DIVE, RESOURCE_ID_IMAGE_DUCK_DIVE, RESOURCE_ID_IMAGE_DUCK_DIVE, 
-  RESOURCE_ID_IMAGE_DUCK_DIVE 
-};
-
-static PropertyAnimation* _animation = NULL;
+static PropertyAnimation *_animation = NULL;
+static AppTimer *_rotationTimer = NULL;
+static int32_t _targetRotationAngle = 0;
 
 static GRect getDuckFrame(uint16_t minute, int16_t width, int16_t height, SCENE scene);
 static int16_t getDuckCoordinateX(uint16_t minute, SCENE scene);
@@ -31,15 +33,20 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene);
 static uint16_t getHorizontalPosition(uint16_t minute);
 static bool isMovingRight(uint16_t minute);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
+static RotationAnimation getRotationAnimation(uint16_t minute, SCENE scene);
+static void rotationTimerCallback(void *callback_data);
 
 DuckLayerData* CreateDuckLayer(Layer* relativeLayer, LayerRelation relation, SCENE scene) {
   DuckLayerData* data = malloc(sizeof(DuckLayerData));
   if (data != NULL) {
     memset(data, 0, sizeof(DuckLayerData));
     data->scene = scene;
-    data->duck.layer = bitmap_layer_create(GRect(0, -5, 5, 5));
-    bitmap_layer_set_compositing_mode(data->duck.layer, GCompOpAnd);
+    data->duck.bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DUCK);
+    data->duck.resourceId = RESOURCE_ID_IMAGE_DUCK;
+    data->duck.layer = rot_bitmap_layer_create(data->duck.bitmap);
+    rot_bitmap_set_compositing_mode(data->duck.layer, GCompOpAnd);
     AddLayer(relativeLayer, (Layer*) data->duck.layer, relation);
+    data->duck.angle = 0;
     data->hidden = false;
     data->lastUpdateMinute = -1;
   }
@@ -60,31 +67,36 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute) {
   // Get duck resource for this minute. Hide layer and exit if no resource (i.e. zero).
   uint32_t duckResourceId = getDuckResourceId(minute, data->scene);
   if (duckResourceId == 0) {
-    if (data->hidden == false) {
-      layer_set_hidden((Layer*) data->duck.layer, true);
-      data->hidden = true;
-    }
-    
+    SetLayerHidden((Layer*) data->duck.layer, &data->hidden, true);
     return;
   }
   
+  GRect rotLayerFrame;
   if (duckResourceId != data->duck.resourceId) {
-    if (data->duck.bitmap != NULL) {
-      gbitmap_destroy(data->duck.bitmap);
-      data->duck.bitmap = NULL;
-      data->duck.resourceId = 0;
-    }
+    rotLayerFrame = RotBitmapGroupChangeBitmap(&data->duck, duckResourceId);
     
-    data->duck.bitmap = gbitmap_create_with_resource(duckResourceId);
-    data->duck.resourceId = duckResourceId;
-    bitmap_layer_set_bitmap(data->duck.layer, data->duck.bitmap);
+    // To be pixel perfect the current frame should be calculated with the new image and
+    // passed into property_animation_create_layer_frame() as the from_frame. However, since
+    // the images are almost the same size, the small offset created by the recentering of
+    // the image on the RotBitmapLayer is imperceptible.
+    
+  } else {
+    rotLayerFrame = layer_get_frame((Layer*) data->duck.layer);   
   }
   
-  GRect newFrame = getDuckFrame(minute, data->duck.bitmap->bounds.size.w, data->duck.bitmap->bounds.size.h, data->scene);
-  layer_set_bounds((Layer*) data->duck.layer, GRect(0, 0, newFrame.size.w, newFrame.size.h));
+  GRect newFrame = getDuckFrame(minute, rotLayerFrame.size.w, rotLayerFrame.size.h, data->scene);
+  
+  // Offset the new frame by the buffer the RotBitmapLayer creates around the bitmap.
+  newFrame.origin.y += ((rotLayerFrame.size.h - data->duck.bitmap->bounds.size.h) / 2);
+  
+  RotationAnimation rotation = getRotationAnimation(minute, data->scene);
+  if (data->duck.angle != rotation.startAngle) {
+    rot_bitmap_layer_set_angle(data->duck.layer, rotation.startAngle);
+    data->duck.angle = rotation.startAngle;
+  }
   
   if (minute == 0 || firstDisplay) {
-    layer_set_frame((Layer*) data->duck.layer, newFrame);    
+    layer_set_frame((Layer*) data->duck.layer, newFrame);
 
   } else if (_animation == NULL) {
     // Create the animation and schedule it.
@@ -97,19 +109,28 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute) {
     }, NULL);
 
     animation_schedule((Animation*) _animation);
+    
+    if (rotation.startAngle != rotation.endAngle  && _rotationTimer == NULL) {
+      _targetRotationAngle = rotation.endAngle;
+      _rotationTimer = app_timer_register(ROTATION_INCREMENT_DURATION, (AppTimerCallback) rotationTimerCallback, (void*) data);
+    }
   }
   
   // The shark layer controls the duck visibility during the SHARK_SCENE_EAT_MINUTE minute.
   bool sharkSceneControl = (data->scene == FRIDAY13 && minute == SHARK_SCENE_EAT_MINUTE);
-  if (data->hidden == true && sharkSceneControl == false) {
-    layer_set_hidden((Layer*) data->duck.layer, false);
-    data->hidden = false;
+  if (sharkSceneControl == false) {
+    SetLayerHidden((Layer*) data->duck.layer, &data->hidden, false);
   }
 }
 
 void DestroyDuckLayer(DuckLayerData* data) {
+  if (_rotationTimer != NULL) {
+    app_timer_cancel(_rotationTimer);
+    _rotationTimer = NULL;
+  }
+  
   if (data != NULL) {    
-    DestroyBitmapGroup(&data->duck);
+    DestroyRotBitmapGroup(&data->duck);
     free(data);
   }
 }
@@ -134,11 +155,11 @@ static int16_t getDuckCoordinateX(uint16_t minute, SCENE scene) {
       break;
     
     default:
-      if (minute < BEGIN_PREPARE_DIVE_MINUTE) {
+      if (minute < BEGIN_DIVE_MINUTE) {
         xCoordinate = _duckCoordinateX[position];
         
       } else {
-        xCoordinate = _duckDiveCoordinateX[minute - BEGIN_PREPARE_DIVE_MINUTE];
+        xCoordinate = _duckDiveCoordinateX[minute - BEGIN_DIVE_MINUTE];
       }
     
       break;
@@ -158,11 +179,11 @@ static int16_t getDuckCoordinateY(uint16_t minute, int16_t imageHeight, SCENE sc
       break;
     
     default:
-      if (minute < BEGIN_PREPARE_DIVE_MINUTE) {
+      if (minute < BEGIN_DIVE_MINUTE) {
         yCoordinate = WATER_TOP(minute) - WAVE_HEIGHT - imageHeight + yWaveOffset;
         
       } else {
-        yCoordinate = _duckDiveCoordinateY[minute - BEGIN_PREPARE_DIVE_MINUTE] - imageHeight;
+        yCoordinate = _duckDiveCoordinateY[minute - BEGIN_DIVE_MINUTE] - imageHeight;
       }
 
     break;
@@ -205,8 +226,9 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
       break;
     
     default:
-      if (minute >= BEGIN_PREPARE_DIVE_MINUTE) {
-        resourceId = _duckDiveResourceId[minute - BEGIN_PREPARE_DIVE_MINUTE];
+      if (minute > BEGIN_DIVE_MINUTE) {
+        // Note: The first minute of the dive sequence is the DUCK_LEFT image that rotates.
+        resourceId = RESOURCE_ID_IMAGE_DUCK_DIVE;
         
       } else if (isMovingRight(minute)) {
         resourceId = RESOURCE_ID_IMAGE_DUCK;
@@ -244,4 +266,35 @@ static bool isMovingRight(uint16_t minute) {
 static void animationStoppedHandler(Animation *animation, bool finished, void *context) {
   property_animation_destroy(_animation);
   _animation = NULL;
+}
+
+static RotationAnimation getRotationAnimation(uint16_t minute, SCENE scene) {
+  RotationAnimation rotate = { 0, 0 };
+  
+  switch (scene) {
+    case DUCK:
+    case CHRISTMAS:
+      if (minute == BEGIN_DIVE_MINUTE) {
+        rotate.startAngle = 0;
+        rotate.endAngle = 360 - (PEBBLE_ANGLE_PER_DEGREE * 60);
+      }
+
+      break;
+    
+    default:
+      break;
+  }
+  
+  return rotate;
+}
+
+static void rotationTimerCallback(void *callback_data) {
+  _rotationTimer = NULL;
+  DuckLayerData *data = (DuckLayerData*) callback_data;
+  
+  data->duck.angle -= (PEBBLE_ANGLE_PER_DEGREE * 5);
+  rot_bitmap_layer_set_angle(data->duck.layer, data->duck.angle);
+  if (data->duck.angle > _targetRotationAngle) {
+    _rotationTimer = app_timer_register(ROTATION_INCREMENT_DURATION, (AppTimerCallback) rotationTimerCallback, (void*) data);
+  }
 }

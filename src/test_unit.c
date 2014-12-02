@@ -21,8 +21,9 @@ TestUnitData* CreateTestUnit() {
   if (data != NULL) {
     memset(data, 0, sizeof(TestUnitData));
         
-    // Friday the 13th
     uint16_t testIndex = 0;
+
+    // Friday the 13th
     
     // Run up to minute 19
     _testData[testIndex].startTime = FEB_12_2015_23_55_00;
@@ -69,7 +70,7 @@ TestUnitData* CreateTestUnit() {
     // Pause at eat minute to let animation run.
     _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (56 * 60);
     _testData[testIndex].stepSeconds = 1;
-    _testData[testIndex].stepCount = 15;
+    _testData[testIndex].stepCount = 10;
     testIndex++;
     
     _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (57 * 60);
