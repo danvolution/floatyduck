@@ -150,7 +150,7 @@ static void drawWatchFace() {
   uint16_t hour = localNow->tm_hour;
   uint16_t minute = localNow->tm_min;
   uint16_t second = localNow->tm_sec;
-
+  
   SCENE scene = getScene(localNow);
   if (scene != _scene) {
     switchScene(scene);

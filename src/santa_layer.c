@@ -1,35 +1,38 @@
 #include <pebble.h>
 #include "santa_layer.h"
 
-#define SANTA_PASS_COUNT 7
+#define SANTA_IMAGE_WIDTH 142
+#define SANTA_IMAGE_HEIGHT 29
+  
 // Have santa fly upwards by PASS_OFFSET_Y y coordinates.
 #define PASS_OFFSET_Y 28
+  
 #define SANTA_ANIMATION_DURATION 10000
+  
+// The last minute in the hour that Santa will fly. Otherwise he gets 
+// too close to the duck.
+#define LAST_ANIMATION_MINUTE 30
+  
+// The highest Y coordinate Santa's fly-by can start.
+#define TOP_PASS_COORDINATE_Y 28
+  
+// The lowest Y coordinate Santa's fly-by can start.
+#define BOTTOM_PASS_COORDINATE_Y 76
 
 typedef struct {
-  uint16_t startMinute;
-  int16_t coordinateY;
-  bool leftToRight;
-} SantaPass;
+  uint32_t duration;
+  uint32_t resourceId;
+  GRect start;
+  GRect end;
+} SantaAnimation;
 
-static SantaPass _santaPass[SANTA_PASS_COUNT] = {
-  { 0, 76, true},
-  { 5, 68, false},
-  { 10, 60, true},
-  { 15, 52, false},
-  { 20, 44, true},
-  { 25, 36, false},
-  { 30, 28, true}
-};
+static PropertyAnimation *_animation = NULL;
 
-static PropertyAnimation* _animation = NULL;
-
-static SantaPass* getSantaPass(uint16_t minute);
-static GRect getSantaStartFrame(SantaPass* pass, int16_t imageWidth, int16_t imageHeight);
-static GRect getSantaStopFrame(SantaPass* pass, int16_t imageWidth, int16_t imageHeight);
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool force);
+static void runAnimation(SantaLayerData *data, SantaAnimation *animation);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 
-SantaLayerData* CreateSantaLayer(Layer* relativeLayer, LayerRelation relation) {
+SantaLayerData* CreateSantaLayer(Layer *relativeLayer, LayerRelation relation) {
   SantaLayerData* data = malloc(sizeof(SantaLayerData));
   if (data != NULL) {
     memset(data, 0, sizeof(SantaLayerData));
@@ -42,36 +45,52 @@ SantaLayerData* CreateSantaLayer(Layer* relativeLayer, LayerRelation relation) {
   return data;
 }
 
-void DrawSantaLayer(SantaLayerData* data, uint16_t hour, uint16_t minute) {  
+void DrawSantaLayer(SantaLayerData *data, uint16_t hour, uint16_t minute) {  
   // Exit if this minute has already been drawn.
   if (data->lastUpdateMinute == minute) {
     return;
   }
   
+  // Remember whether first time called.
+  bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
+  
+  // Exit if time is past LAST_ANIMATION_MINUTE since the water level is too high at this point.
+  if (minute > LAST_ANIMATION_MINUTE) {
+    return;
+  }
   
   // Exit if animation already running
   if (_animation != NULL) {
     return;
   }
   
-  SantaPass *pass = getSantaPass(minute);
-  if (pass == NULL) {
+  // Check if there is an animation for the current minute. Force animation if watchface just loaded.
+  SantaAnimation *santaAnimation = getSantaAnimation(minute, firstDisplay);
+  if (santaAnimation == NULL) {
     return;
   }
 
-  uint32_t santaResourceId = pass->leftToRight ? RESOURCE_ID_IMAGE_SANTA : RESOURCE_ID_IMAGE_SANTA_LEFT;
-  BitmapGroupSetBitmap(&data->santa, santaResourceId);
+  runAnimation(data, santaAnimation);
+  free(santaAnimation);
+}
 
-  GRect startFrame = getSantaStartFrame(pass, data->santa.bitmap->bounds.size.w, data->santa.bitmap->bounds.size.h);
-  GRect stopFrame = getSantaStopFrame(pass, data->santa.bitmap->bounds.size.w, data->santa.bitmap->bounds.size.h);
+void DestroySantaLayer(SantaLayerData *data) {
+  if (data != NULL) {    
+    DestroyBitmapGroup(&data->santa);
+    free(data);
+  }  
+}
+
+static void runAnimation(SantaLayerData *data, SantaAnimation *santaAnimation) {
+  BitmapGroupSetBitmap(&data->santa, santaAnimation->resourceId);
   
-  layer_set_frame((Layer*) data->santa.layer, startFrame);    
-  layer_set_bounds((Layer*) data->santa.layer, GRect(0, 0, startFrame.size.w, startFrame.size.h));    
+  layer_set_frame((Layer*) data->santa.layer, santaAnimation->start);    
+  layer_set_bounds((Layer*) data->santa.layer, GRect(0, 0, santaAnimation->start.size.w, santaAnimation->start.size.h));    
   
   // Create the animation and schedule it.
-  _animation = property_animation_create_layer_frame((Layer*) data->santa.layer, NULL, &stopFrame);
-  animation_set_duration((Animation*) _animation, SANTA_ANIMATION_DURATION);
+  _animation = property_animation_create_layer_frame((Layer*) data->santa.layer, NULL, &santaAnimation->end);
+  animation_set_duration((Animation*) _animation, santaAnimation->duration);
   animation_set_curve((Animation*) _animation, AnimationCurveLinear);
   animation_set_handlers((Animation*) _animation, (AnimationHandlers) {
     .started = NULL,
@@ -81,33 +100,40 @@ void DrawSantaLayer(SantaLayerData* data, uint16_t hour, uint16_t minute) {
   animation_schedule((Animation*) _animation);
 }
 
-void DestroySantaLayer(SantaLayerData* data) {
-  if (data != NULL) {    
-    DestroyBitmapGroup(&data->santa);
-    free(data);
-  }  
-}
-
-static SantaPass* getSantaPass(uint16_t minute) {
-  for (int passIndex = 0; passIndex < SANTA_PASS_COUNT; passIndex++) {
-    if (minute == _santaPass[passIndex].startMinute) {
-      return &_santaPass[passIndex];
-    }
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool force) {
+  // No animations past LAST_ANIMATION_MINUTE since the water level is too high at this point.
+  if (minute > LAST_ANIMATION_MINUTE) {
+    return NULL;
   }
   
-  return NULL;
-}
-
-static GRect getSantaStartFrame(SantaPass* pass, int16_t imageWidth, int16_t imageHeight) {
-  int16_t x = pass->leftToRight ? (0 - imageWidth) : SCREEN_WIDTH;
+  // Create animation every 5 minutes or if force is true.
+  if ((minute % 5 != 0) && (force == false)) {
+    return NULL;
+  }
   
-  return (GRect) { .origin = { x, pass->coordinateY }, .size = { imageWidth, imageHeight} };
-}
+  SantaAnimation *santaAnimation = malloc(sizeof(SantaAnimation));
+  if (santaAnimation == NULL) {
+    return NULL;
+  }
 
-static GRect getSantaStopFrame(SantaPass* pass, int16_t imageWidth, int16_t imageHeight) {
-  int16_t x = pass->leftToRight ? SCREEN_WIDTH : (0 - imageWidth);
+  bool flyRight = (minute % 2 == 0);
   
-  return (GRect) { .origin = { x, (pass->coordinateY - PASS_OFFSET_Y) }, .size = { imageWidth, imageHeight} };
+  // Position Santa's fly-by in the fly zone between y coordinates BOTTOM_PASS_COORDINATE_Y and TOP_PASS_COORDINATE_Y
+  int16_t coordinateY = BOTTOM_PASS_COORDINATE_Y - (BOTTOM_PASS_COORDINATE_Y - TOP_PASS_COORDINATE_Y) * minute / LAST_ANIMATION_MINUTE;
+
+  santaAnimation->resourceId = flyRight ? RESOURCE_ID_IMAGE_SANTA : RESOURCE_ID_IMAGE_SANTA_LEFT;
+  santaAnimation->duration = SANTA_ANIMATION_DURATION;
+  santaAnimation->start = (GRect) { 
+    .origin = { flyRight ? (0 - SANTA_IMAGE_WIDTH) : SCREEN_WIDTH, coordinateY }, 
+    .size = { SANTA_IMAGE_WIDTH, SANTA_IMAGE_HEIGHT } 
+  };
+  
+  santaAnimation->end = (GRect) { 
+    .origin = { flyRight ? SCREEN_WIDTH : (0 - SANTA_IMAGE_WIDTH), (coordinateY - PASS_OFFSET_Y) }, 
+    .size = { SANTA_IMAGE_WIDTH, SANTA_IMAGE_HEIGHT} 
+  };
+  
+  return santaAnimation;
 }
 
 static void animationStoppedHandler(Animation *animation, bool finished, void *context) {
