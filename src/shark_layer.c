@@ -1,9 +1,6 @@
 #include <pebble.h>
 #include "shark_layer.h"
 
-// RESOURCE_ID_IMAGE_SHARK_LEFT image width
-#define SHARK_LEFT_WIDTH 88
-  
 #define FIRST_SHARK_PASS_MINUTE 20
 #define LAST_SHARK_PASS_MINUTE 50
   
