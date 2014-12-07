@@ -1,17 +1,18 @@
 #include <pebble.h>
 #include "test_unit.h"
 
-#define DEC_24_2014_23_55_00 1419465300
-#define FEB_12_2015_23_55_00 1423785300
-#define NOV_26_2014_23_55_00 1417046100
+#define DEC_25_2014_00_00_00 1419465600
+#define FEB_13_2015_00_00_00 1423785600
+#define NOV_27_2014_00_00_00 1417046400
 #define JAN_01_2015_00_00_00 1420070400
   
-#define TEST_COUNT 26
+#define TEST_COUNT 24
 
 typedef struct {
   time_t startTime;
   uint16_t stepSeconds;
   uint16_t stepCount;
+  uint16_t endPauseCount;
 } TestData;
 
 static TestData _testData[TEST_COUNT];
@@ -25,105 +26,123 @@ TestUnitData* CreateTestUnit() {
 
     // Friday the 13th
     
-    // Run up to minute 19
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00;
+    // Run up to minute 0 and pause for fly-in
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 24;
-    testIndex++;
-    
-    // Pause at minute 19.
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (24 * 60);
-    _testData[testIndex].stepSeconds = 1;
-    _testData[testIndex].stepCount = 8;
-    testIndex++;
-    
-    // Run up to minute 30
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (25 * 60);
-    _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 10;
-    testIndex++;
-    
-    // Pause at minute 30
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (35 * 60);
-    _testData[testIndex].stepSeconds = 1;
-    _testData[testIndex].stepCount = 8;
-    testIndex++;
-    
-    // Run up to minute 41
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (36 * 60);
-    _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 10;
-    testIndex++;
-    
-    // Pause at minute 41
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (46 * 60);
-    _testData[testIndex].stepSeconds = 1;
-    _testData[testIndex].stepCount = 8;
-    testIndex++;
-    
-    // Run up to minute 51
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (47 * 60);
-    _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 9;
+    _testData[testIndex].stepCount = 5;
+    _testData[testIndex].endPauseCount = 5;
     testIndex++;
 
-    // Pause at eat minute to let animation run.
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (56 * 60);
-    _testData[testIndex].stepSeconds = 1;
-    _testData[testIndex].stepCount = 10;
+    // Run up to minute 20 and pause
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (1 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 19;
+    _testData[testIndex].endPauseCount = SHARK_ANIMATION_DURATION / 1000;
+    testIndex++;
+ 
+    // Wait for shark to pass by starting at minute 20 to 50
+    for (int index = 0; index < 6; index++) {
+      _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (21 * 60) + (5 * index * 60);
+      _testData[testIndex].stepSeconds = 60;
+      _testData[testIndex].stepCount = 4;
+      _testData[testIndex].endPauseCount = SHARK_ANIMATION_DURATION / 1000;
+      testIndex++;
+    }
+    
+    // Run minute 51 and pause for eat minute
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (51 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 0;
+    _testData[testIndex].endPauseCount = 10;
     testIndex++;
     
-    _testData[testIndex].startTime = FEB_12_2015_23_55_00 + (57 * 60);
+    // Run up to minute 0 and pause for fly-in
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (52 * 60);
     _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 13;
+    _testData[testIndex].stepCount = 8;
+    _testData[testIndex].endPauseCount = 5;
+    testIndex++;
+    
+    // Run to 5 minutes past
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (61 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 4;
     testIndex++;
 
     // Christmas
     
-    // Increment by 5 minutes and then effectively pause for 10 seconds to let
-    // animation run.
+    // Start at 5 minutes before the hour, run to 30 minutes past, 
+    // increment by 5 minutes, and then pause to let animation run.
     for (int index = 0; index < 7; index++) {
-      _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (5 * index * 60);
+      _testData[testIndex].startTime = DEC_25_2014_00_00_00 - (5 * 60) + (5 * index * 60);
       _testData[testIndex].stepSeconds = 60;
       _testData[testIndex].stepCount = 5;
-      testIndex++;
-  
-      _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (5 * (index + 1) * 60);
-      _testData[testIndex].stepSeconds = 1;
-      _testData[testIndex].stepCount = 10;
+      _testData[testIndex].endPauseCount = SANTA_ANIMATION_DURATION / 1000;
       testIndex++;
     }
     
-    _testData[testIndex].startTime = DEC_24_2014_23_55_00 + (35 * 60);
+    // Run up to minute 0 and pause for fly-in
+    _testData[testIndex].startTime = DEC_25_2014_00_00_00 + (30 * 60);
     _testData[testIndex].stepSeconds = 60;
-    _testData[testIndex].stepCount = 35;
+    _testData[testIndex].stepCount = 30;
+    _testData[testIndex].endPauseCount = 5;
+    testIndex++;
+    
+    // Run to 5 minutes past
+    _testData[testIndex].startTime = DEC_25_2014_00_00_00 + (61 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 4;
     testIndex++;
     
     // Thanksgiving
-    _testData[testIndex].startTime = NOV_26_2014_23_55_00;
+    
+    // Start at 5 minutes before the hour
+    _testData[testIndex].startTime = NOV_27_2014_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 60;
     _testData[testIndex].stepCount = 70;
     testIndex++;
-    
+   
     // Normal. Increment by 61 minutes so hour and minute changes.
-    _testData[testIndex].startTime = JAN_01_2015_00_00_00;
+    
+    // Start at 5 minutes before the hour and run to minute 0
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 3660;
-    _testData[testIndex].stepCount = 60;
+    _testData[testIndex].stepCount = 5;
+    _testData[testIndex].endPauseCount = 5;
+   testIndex++;
+    
+    // Run to minute 0 and pause for fly-in
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (1 * 60);
+    _testData[testIndex].stepSeconds = 3660;
+    _testData[testIndex].stepCount = 59;
+    _testData[testIndex].endPauseCount = 5;
+    testIndex++;
+     
+    // Run to 5 minutes past
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (61 * 60);
+    _testData[testIndex].stepSeconds = 3660;
+    _testData[testIndex].stepCount = 4;
     testIndex++;
   }
   
   return data;
 }
 
-void DestroyTestUnit(TestUnitData* data) {
+void DestroyTestUnit(TestUnitData *data) {
   if (data != NULL) {
     free(data);
   }
 }
 
-time_t TestUnitGetTime(TestUnitData* data) {
+time_t TestUnitGetTime(TestUnitData *data) {
   // Check if we need to roll over to next test.
-  if (data->stepIndex >= _testData[data->testIndex].stepCount) {
+  if (data->stepIndex > _testData[data->testIndex].stepCount) {
+    // Run through the pause count
+    if (data->endPauseRemaining > 0) {
+      data->endPauseRemaining--;
+      return data->time;
+    }
+    
     data->stepIndex = 0;
     data->testIndex++;
     if (data->testIndex >= TEST_COUNT) {
@@ -134,6 +153,7 @@ time_t TestUnitGetTime(TestUnitData* data) {
   // Check if first step of TestData
   if (data->stepIndex == 0) {
     data->time = _testData[data->testIndex].startTime;
+    data->endPauseRemaining = _testData[data->testIndex].endPauseCount;
     
   } else {
     data->time += _testData[data->testIndex].stepSeconds;

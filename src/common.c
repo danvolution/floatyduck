@@ -128,6 +128,16 @@ static uint16_t getImageHypotenuse(uint32_t imageResourceId) {
       hypotenuse = 41;
       break;
     
+    case RESOURCE_ID_IMAGE_DUCK_LANDING:
+    case RESOURCE_ID_IMAGE_DUCK_LANDING_LEFT:
+      hypotenuse = 59;
+      break;
+    
+    case RESOURCE_ID_IMAGE_DUCK_TAKING_OFF:
+    case RESOURCE_ID_IMAGE_DUCK_TAKING_OFF_LEFT:
+      hypotenuse = 68;
+      break;
+    
     case RESOURCE_ID_IMAGE_TURKEY:
     case RESOURCE_ID_IMAGE_TURKEY_LEFT:
       hypotenuse = 42;

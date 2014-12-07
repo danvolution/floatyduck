@@ -1,5 +1,3 @@
-//#define RUN_TEST true
-  
 #include <pebble.h>
 #include "common.h"
 #include "marker_layer.h"
@@ -36,6 +34,7 @@ static void deinit();
 static void main_window_load(Window *window);
 static void main_window_unload(Window *window);
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed);
+static void tap_handler(AccelAxisType axis, int32_t direction);
 static void drawWatchFace();
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second);
 static SCENE getScene(struct tm* now);
@@ -48,7 +47,7 @@ int main(void) {
 }
 
 static void init() {
-  _scene = UNDEFINED;
+  _scene = UNDEFINED_SCENE;
   
 #ifdef RUN_TEST
   _testUnitData = CreateTestUnit();
@@ -71,9 +70,13 @@ static void init() {
 #else
   tick_timer_service_subscribe(MINUTE_UNIT, timer_handler);
 #endif
+
+  // Register for accelerometer tap events
+  accel_tap_service_subscribe(&tap_handler);
 }
 
 static void deinit() {
+  accel_tap_service_unsubscribe();
   animation_unschedule_all();
 
 #ifdef RUN_TEST
@@ -139,6 +142,23 @@ static void timer_handler(struct tm *tick_time, TimeUnits units_changed) {
   drawWatchFace();
 }
 
+static void tap_handler(AccelAxisType axis, int32_t direction) {
+  if (_duckData != NULL) {
+#ifdef RUN_TEST
+    time_t now = _testUnitData->time;
+#else
+    time_t now = time(NULL); 
+#endif
+  
+    struct tm* localNow = localtime(&now);
+    uint16_t hour = localNow->tm_hour;
+    uint16_t minute = localNow->tm_min;
+    uint16_t second = localNow->tm_sec;
+    
+    HandleTapDuckLayer(_duckData, hour, minute, second);
+  }
+}
+
 static void drawWatchFace() {
 #ifdef RUN_TEST
   time_t now = TestUnitGetTime(_testUnitData); 
@@ -166,7 +186,7 @@ static void drawWatchFace() {
 
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second) {
   if (_duckData != NULL) {
-    DrawDuckLayer(_duckData, hour, minute);
+    DrawDuckLayer(_duckData, hour, minute, second);
   }
   
   if (_bubbleData != NULL) {
@@ -220,7 +240,7 @@ static void switchScene(SCENE scene) {
       _duckData = CreateDuckLayer((Layer*) _waterData->inverterLayer, BELOW_SIBLING, scene);
       
     } else {
-      SwitchDuckScene(_duckData, scene);
+      SwitchSceneDuckLayer(_duckData, scene);
     }
   } else if (duckLayer == false && _duckData != NULL) {
     DestroyDuckLayer(_duckData);

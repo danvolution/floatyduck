@@ -9,6 +9,26 @@
     "resources": {
         "media": [
             {
+                "file": "images/duck_taking_off.png",
+                "name": "IMAGE_DUCK_TAKING_OFF",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_taking_off_left.png",
+                "name": "IMAGE_DUCK_TAKING_OFF_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_landing_left.png",
+                "name": "IMAGE_DUCK_LANDING_LEFT",
+                "type": "png"
+            },
+            {
+                "file": "images/duck_landing.png",
+                "name": "IMAGE_DUCK_LANDING",
+                "type": "png"
+            },
+            {
                 "file": "images/shark_open4.png",
                 "name": "IMAGE_SHARK_OPEN_4",
                 "type": "png"

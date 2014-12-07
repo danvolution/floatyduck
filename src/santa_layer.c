@@ -2,25 +2,24 @@
 #include "santa_layer.h"
 
 #define SANTA_IMAGE_WIDTH 142
-#define SANTA_IMAGE_HEIGHT 29
+#define SANTA_IMAGE_HEIGHT 29 
   
 // Have santa fly upwards by PASS_OFFSET_Y y coordinates.
 #define PASS_OFFSET_Y 28
-  
-#define SANTA_ANIMATION_DURATION 10000
-  
-// The last minute in the hour that Santa will fly. Otherwise he gets 
-// too close to the duck.
-#define LAST_ANIMATION_MINUTE 30
   
 // The highest Y coordinate Santa's fly-by can start.
 #define TOP_PASS_COORDINATE_Y 28
   
 // The lowest Y coordinate Santa's fly-by can start.
 #define BOTTOM_PASS_COORDINATE_Y 76
+  
+// The last minute in the hour that Santa will fly. Otherwise he gets 
+// too close to the duck.
+#define LAST_ANIMATION_MINUTE 30
 
 typedef struct {
   uint32_t duration;
+  uint32_t delay;
   uint32_t resourceId;
   GRect start;
   GRect end;
@@ -28,7 +27,7 @@ typedef struct {
 
 static PropertyAnimation *_animation = NULL;
 
-static SantaAnimation* getSantaAnimation(uint16_t minute, bool force);
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool firstDisplay);
 static void runAnimation(SantaLayerData *data, SantaAnimation *animation);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 
@@ -91,6 +90,7 @@ static void runAnimation(SantaLayerData *data, SantaAnimation *santaAnimation) {
   // Create the animation and schedule it.
   _animation = property_animation_create_layer_frame((Layer*) data->santa.layer, NULL, &santaAnimation->end);
   animation_set_duration((Animation*) _animation, santaAnimation->duration);
+  animation_set_delay((Animation*) _animation, santaAnimation->delay);
   animation_set_curve((Animation*) _animation, AnimationCurveLinear);
   animation_set_handlers((Animation*) _animation, (AnimationHandlers) {
     .started = NULL,
@@ -100,14 +100,14 @@ static void runAnimation(SantaLayerData *data, SantaAnimation *santaAnimation) {
   animation_schedule((Animation*) _animation);
 }
 
-static SantaAnimation* getSantaAnimation(uint16_t minute, bool force) {
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool firstDisplay) {
   // No animations past LAST_ANIMATION_MINUTE since the water level is too high at this point.
   if (minute > LAST_ANIMATION_MINUTE) {
     return NULL;
   }
   
-  // Create animation every 5 minutes or if force is true.
-  if ((minute % 5 != 0) && (force == false)) {
+  // Create animation every 5 minutes or if displaying for the first time.
+  if ((minute % 5 != 0) && (firstDisplay == false)) {
     return NULL;
   }
   
@@ -123,6 +123,7 @@ static SantaAnimation* getSantaAnimation(uint16_t minute, bool force) {
 
   santaAnimation->resourceId = flyRight ? RESOURCE_ID_IMAGE_SANTA : RESOURCE_ID_IMAGE_SANTA_LEFT;
   santaAnimation->duration = SANTA_ANIMATION_DURATION;
+  santaAnimation->delay = (firstDisplay ? FIRST_DISPLAY_ANIMATION_DELAY : 0);
   santaAnimation->start = (GRect) { 
     .origin = { flyRight ? (0 - SANTA_IMAGE_WIDTH) : SCREEN_WIDTH, coordinateY }, 
     .size = { SANTA_IMAGE_WIDTH, SANTA_IMAGE_HEIGHT } 
