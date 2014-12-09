@@ -3,26 +3,27 @@
 
 #define FIRST_SHARK_PASS_MINUTE 20
 #define LAST_SHARK_PASS_MINUTE 50
+
+#define SHARK_LEFT_WIDTH 88
   
 // Have the shark pass under the duck by PASS_OFFSET_Y y coordinates.
 #define PASS_OFFSET_Y 15
   
-// Number of animations for eating the duck
-#define SHARK_EAT_COUNT 13
-  
-// Index in _sharkEat at which the duck layer should be hidden.
-#define EAT_ANIMATION_HIDE_DUCK_INDEX 6
-  
 // Control speed of eat animation. Units are milliseconds per coordinate X.
 #define EAT_ANIMATION_SPEED_FACTOR 30
-  
-// Seconds past the eat animation minute that the animation should not be run.
-// Otherwise the animation would spill over to the next minute.
-#define ANIMATION_CUTOFF_SECOND 50
 
 #define OFF_SCREEN_LEFT_COORD -998
 
 typedef enum { SHARK_UNDEFINED, SHARK_PASS, SHARK_EAT } SharkAnimationType;
+
+typedef enum { EAT_INITIAL, EAT_LEFT, EAT_OPEN_1, EAT_OPEN_2, EAT_OPEN_3, EAT_OPEN_4, EAT_OPEN_5, 
+               EAT_1, EAT_2, EAT_3, EAT_4, EAT_FINISHED } EatState;
+
+typedef struct {
+  EatState state;
+  GPoint endPoint;
+  bool up;   // Moving up
+} EatStateMachine;
 
 typedef struct {
   SharkAnimationType type;
@@ -33,29 +34,14 @@ typedef struct {
   GPoint endPoint;
 } SharkAnimation;
 
-static SharkAnimation _sharkEat[SHARK_EAT_COUNT] = {
-  { SHARK_EAT, 46 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_LEFT, { SCREEN_WIDTH, 24 }, { 98, 10 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_1, { 98, 10 }, { 93, 8 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_2, { 93, 8 }, { 88, 6 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_3, { 88, 6 }, { 83, 4 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_4, { 83, 4 }, { 78, 2 } },
-  { SHARK_EAT, 13 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_5, { 78, 2 }, { 65, 0 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_EAT_1, { 65, 0 }, { 60, 2 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_EAT_2, { 60, 2 }, { 55, 4 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_EAT_3, { 55, 4 }, { 50, 6 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_EAT_4, { 50, 6 }, { 45, 8 } }, 
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_2, { 45, 6 }, { 40, 8 } },
-  { SHARK_EAT, 5 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_OPEN_1, { 40, 8 }, { 35, 10 } },
-  { SHARK_EAT, 123 * EAT_ANIMATION_SPEED_FACTOR, 0, RESOURCE_ID_IMAGE_SHARK_LEFT, { 35, 10 }, { OFF_SCREEN_LEFT_COORD, 36 } }
-};
-
 static PropertyAnimation *_animation = NULL;
 static SharkAnimationType _animationType = SHARK_UNDEFINED;
-static uint16_t _eatAnimationIndex = 0;
 static AppTimer *_eatTimer = NULL;
-  
+static EatStateMachine _eatState;
+
 static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation);
-static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second, bool firstDisplay);
+static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay);
+static SharkAnimation* getEatAnimation(SharkLayerData *data);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 static void eatTimerCallback(void *callback_data);
 static void resolveCoordinateSubstitution(GPoint *point, uint16_t objectWidth);
@@ -85,12 +71,8 @@ void DrawSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16
   bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
   
-  SharkAnimation *sharkAnimation = getSharkAnimation(minute, second, firstDisplay);
+  SharkAnimation *sharkAnimation = getSharkAnimation(data, minute, second, firstDisplay);
   if (sharkAnimation != NULL && _animation == NULL) {
-    if (sharkAnimation->type == SHARK_EAT) {
-      _eatAnimationIndex = 0;
-    }
-	
     SetLayerHidden((Layer*) data->shark.layer, &data->hidden, false);
     runAnimation(data, sharkAnimation);
 	
@@ -98,11 +80,10 @@ void DrawSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16
     SetLayerHidden((Layer*) data->shark.layer, &data->hidden, true);
   }
   
-  // The duck layer is showing if watchface was loaded between 53:50 and 53:59, so hide it if
+  // The duck layer is showing if watchface was loaded between 51:50 and 51:59, so hide it if
   // animation isn't running.
   if (minute == SHARK_SCENE_EAT_MINUTE && _animation == NULL && data->duckData->hidden == false) {
-      layer_set_hidden((Layer*) data->duckData->duck.layer, true);
-      data->duckData->hidden = true;
+    SetLayerHidden((Layer*) data->duckData->duck.layer, &data->duckData->hidden, true);
   }
   
   if (sharkAnimation != NULL) {
@@ -145,14 +126,17 @@ static void runAnimation(SharkLayerData *data, SharkAnimation *sharkAnimation) {
   }
 }
 
-static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second, bool firstDisplay) {
-  // Limit animation to between startMinute and ANIMATION_CUTOFF_SECOND seconds.
+static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay) {
   if (minute == SHARK_SCENE_EAT_MINUTE) {
     SharkAnimation *sharkAnimation = NULL;
-    if (second < ANIMATION_CUTOFF_SECOND) {
-      sharkAnimation = malloc(sizeof(SharkAnimation));
+    
+    // Don't let eat animation run over into next minute.
+    if (second < 59 - ((SCREEN_WIDTH + SHARK_LEFT_WIDTH) * EAT_ANIMATION_SPEED_FACTOR / 1000)) {
+      memset(&_eatState, 0, sizeof(EatStateMachine));
+      _eatState.state = EAT_INITIAL;
+      
+      sharkAnimation = getEatAnimation(data);
       if (sharkAnimation != NULL) {
-        memcpy(sharkAnimation, &_sharkEat[0], sizeof(SharkAnimation));
         sharkAnimation->delay = (firstDisplay ? FIRST_DISPLAY_ANIMATION_DELAY : 0);
       }
     }
@@ -169,7 +153,7 @@ static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second, bool 
     return NULL;
   }
   
-  // Don't do animation if the minute before the eat sequence would run over into the eat minute.
+  // Don't do animation if it would run over into the eat minute.
   if (minute == (SHARK_SCENE_EAT_MINUTE - 1) && second >= (58 - (SHARK_ANIMATION_DURATION / 1000))) {
     return NULL;
   }
@@ -194,14 +178,170 @@ static SharkAnimation* getSharkAnimation(uint16_t minute, uint16_t second, bool 
   return sharkAnimation;
 }
 
+static SharkAnimation* getEatAnimation(SharkLayerData *data) {
+  SharkAnimation *sharkAnimation = malloc(sizeof(SharkAnimation));
+  if (sharkAnimation == NULL) {
+    return NULL;
+  }
+  
+  memset(sharkAnimation, 0, sizeof(SharkAnimation));
+  EatStateMachine newState;
+  memset(&newState, 0, sizeof(EatStateMachine));
+  
+  uint32_t resourceId = 0;
+  switch (_eatState.state) {
+    case EAT_INITIAL:
+      newState.up = (data->duckData->exited == false);
+      if (newState.up) {
+        newState.endPoint = GPoint(98, 10);
+        
+      } else {
+        // Duck has already flew away. Swim the whole width of the screen.
+        newState.endPoint = GPoint(0 - SHARK_LEFT_WIDTH, 36);
+      }
+    
+      newState.state = EAT_LEFT;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (SCREEN_WIDTH - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                           RESOURCE_ID_IMAGE_SHARK_LEFT, { SCREEN_WIDTH, 24 }, newState.endPoint };
+    
+      break;
+    
+    case EAT_LEFT:
+      if (_eatState.up) {
+        newState.up = (data->duckData->exited == false);
+        if (newState.up) {
+          newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y - 2);
+          
+        } else {
+          newState.endPoint = GPoint(0 - SHARK_LEFT_WIDTH, 36);
+        }
+
+        resourceId = newState.up ? RESOURCE_ID_IMAGE_SHARK_OPEN_1 : RESOURCE_ID_IMAGE_SHARK_LEFT;
+        newState.state = newState.up ? EAT_OPEN_1 : EAT_LEFT;
+        *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                             resourceId, _eatState.endPoint, newState.endPoint };
+        
+      } else {
+        newState.state = EAT_FINISHED;
+      }
+    
+      break;
+    
+    case EAT_OPEN_1:
+      newState.up = (data->duckData->exited == false) && _eatState.up;
+      if (newState.up) {
+        newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y - 2);
+
+      } else {
+        newState.endPoint = GPoint(0 - SHARK_LEFT_WIDTH, 36);
+      }
+    
+      resourceId = newState.up ? RESOURCE_ID_IMAGE_SHARK_OPEN_2 : RESOURCE_ID_IMAGE_SHARK_LEFT;
+      newState.state = newState.up ? EAT_OPEN_2 : EAT_LEFT;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          resourceId, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_OPEN_2:
+      newState.up = (data->duckData->exited == false) && _eatState.up;
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + (newState.up ? -2 : 2));
+      resourceId = newState.up ? RESOURCE_ID_IMAGE_SHARK_OPEN_3 : RESOURCE_ID_IMAGE_SHARK_OPEN_1;
+      newState.state = newState.up ? EAT_OPEN_3 : EAT_OPEN_1;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          resourceId, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_OPEN_3:
+      newState.up = (data->duckData->exited == false) && _eatState.up;
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + (newState.up ? -2 : 2));
+      resourceId = newState.up ? RESOURCE_ID_IMAGE_SHARK_OPEN_4 : RESOURCE_ID_IMAGE_SHARK_OPEN_2;
+      newState.state = newState.up ? EAT_OPEN_4 : EAT_OPEN_2;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          resourceId, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_OPEN_4:
+      newState.up = (data->duckData->exited == false) && _eatState.up;
+      if (newState.up) {
+        newState.endPoint = GPoint(_eatState.endPoint.x - 13, _eatState.endPoint.y - 2);
+
+      } else {
+        newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      }
+    
+      resourceId = newState.up ? RESOURCE_ID_IMAGE_SHARK_OPEN_5 : RESOURCE_ID_IMAGE_SHARK_OPEN_3;
+      newState.state = newState.up ? EAT_OPEN_5 : EAT_OPEN_3;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          resourceId, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_OPEN_5:
+      newState.up = false;
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      resourceId = data->duckData->exited ? RESOURCE_ID_IMAGE_SHARK_OPEN_4 : RESOURCE_ID_IMAGE_SHARK_EAT_1;
+      newState.state = data->duckData->exited ? EAT_OPEN_4 : EAT_1;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          resourceId, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_1:
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      newState.state = EAT_2;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          RESOURCE_ID_IMAGE_SHARK_EAT_2, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_2:
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      newState.state = EAT_3;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          RESOURCE_ID_IMAGE_SHARK_EAT_3, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_3:
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      newState.state = EAT_4;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          RESOURCE_ID_IMAGE_SHARK_EAT_4, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    case EAT_4:
+      newState.endPoint = GPoint(_eatState.endPoint.x - 5, _eatState.endPoint.y + 2);
+      newState.state = EAT_OPEN_2;
+      *sharkAnimation = (SharkAnimation) { SHARK_EAT, (_eatState.endPoint.x - newState.endPoint.x) * EAT_ANIMATION_SPEED_FACTOR, 0, 
+                                          RESOURCE_ID_IMAGE_SHARK_OPEN_2, _eatState.endPoint, newState.endPoint };
+        
+      break;
+    
+    default:
+      newState.state = EAT_FINISHED;
+      break;
+  }
+  
+  memcpy(&_eatState, &newState, sizeof(EatStateMachine));
+  if (newState.state == EAT_FINISHED && sharkAnimation != NULL) {
+    free(sharkAnimation);
+    sharkAnimation = NULL;
+  }
+  
+  return sharkAnimation;
+}
+
 static void animationStoppedHandler(Animation *animation, bool finished, void *context) {
   property_animation_destroy(_animation);
   _animation = NULL;
   
-  if (finished && _animationType == SHARK_EAT && (_eatAnimationIndex + 1) < SHARK_EAT_COUNT) {
+  if (finished && _animationType == SHARK_EAT) {
     // Work-around to crash in the Pebble animation_schedule() function in runAnimation().
     // Schedule a timer to run the next animation.
-    _eatAnimationIndex++;
     _eatTimer = app_timer_register(10, (AppTimerCallback) eatTimerCallback, context);
   }
 }
@@ -210,15 +350,21 @@ static void eatTimerCallback(void *callback_data) {
   _eatTimer = NULL;
   SharkLayerData* data = (SharkLayerData*) callback_data;
 
-  // The shark layer is responsible for showing/hiding the duck layer in minute SHARK_SCENE_EAT_MINUTE.
-  SetLayerHidden((Layer*) data->duckData->duck.layer, &data->duckData->hidden, 
-                 (_eatAnimationIndex >= EAT_ANIMATION_HIDE_DUCK_INDEX));
+  SharkAnimation *animation = getEatAnimation(data);
   
-  if (_eatAnimationIndex == EAT_ANIMATION_HIDE_DUCK_INDEX) {
+  if (animation == NULL) {
+    return;
+  }
+  
+  if (_eatState.state == EAT_1) {
+    // The duck has now been eaten.
     data->duckData->exited = true;
+    // The shark layer is responsible for showing/hiding the duck layer in minute SHARK_SCENE_EAT_MINUTE.
+    SetLayerHidden((Layer*) data->duckData->duck.layer, &data->duckData->hidden, true);
   }
                  
-  runAnimation(data, &_sharkEat[_eatAnimationIndex]);
+  runAnimation(data, animation);
+  free(animation);
 }
 
 static void resolveCoordinateSubstitution(GPoint *point, uint16_t objectWidth) {

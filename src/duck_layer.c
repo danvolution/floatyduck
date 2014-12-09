@@ -9,10 +9,6 @@
 #define OFF_SCREEN_LEFT_COORD -998
 #define OFF_SCREEN_RIGHT_COORD -997
   
-// Seconds past the minute that the fly-in animation should not be run.
-// Otherwise the animation would spill over to the next minute.
-#define FLY_IN_CUTOFF_SECOND 55
-  
 // Have duck fly in from above by FLY_IN_OFFSET_Y y coordinates.
 #define FLY_IN_OFFSET_Y 40
 
@@ -21,6 +17,10 @@
 #define FLY_IN_DURATION 1500
 #define FLY_OUT_DURATION 1500
 #define FLY_OUT_IN_DELAY 1000
+  
+// Seconds past the minute that the fly-in animation should not be run.
+// Otherwise the animation would spill over to the next minute.
+#define FLY_IN_CUTOFF_SECOND 57
   
 // Milliseconds between each rotation increment when duck is starting dive.
 #define ROTATION_INCREMENT_DURATION 50
@@ -60,28 +60,27 @@ static AppTimer *_flyInTimer = NULL;
 static AppTimer *_flyOutTimer = NULL;
 
 static PropertyAnimation* runAnimation(DuckLayerData *data, DuckAnimation *duckAnimation, uint16_t minute);
+static DuckAnimation* getAnimation(uint16_t minute, SCENE scene);
+static DuckAnimation* getDiveAnimation(uint16_t minute);
+static DuckAnimation* getFlyInAnimation(uint16_t minute);
+static DuckAnimation* getFlyOutAnimation(uint16_t minute);
+static DISPLAY_ACTION getDisplayAction(DuckLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay);
+static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute);
 static uint32_t getDuckResourceId(uint16_t minute, SCENE scene);
+static bool isAnimationInProgress();
+static void disableAnimations(DuckAnimation *duckAnimation);
 static GPoint getDuckWavePoint(uint16_t minute);
-static GRect getFrameFromPoint(GPoint bottomCenter, int16_t width, int16_t height);
 static uint16_t getHorizontalPosition(uint16_t minute);
-static void resolveCoordinateSubstitution(GPoint *point, uint16_t objectWidth, uint16_t minute);
+static GRect getFrameFromPoint(GPoint bottomCenter, int16_t width, int16_t height);
 static bool isMovingRight(uint16_t minute);
-static DISPLAY_ACTION getDisplayAction(uint16_t minute, uint16_t second, SCENE scene, bool firstDisplay);
 static bool isSharkSceneControl(SCENE scene, uint16_t minute);
+static void resolveCoordinateSubstitution(GPoint *point, uint16_t objectWidth, uint16_t minute);
 static void moveAnimationStopped(Animation *animation, bool finished, void *context);
 static void flyInAnimationStopped(Animation *animation, bool finished, void *context);
 static void flyOutAnimationStopped(Animation *animation, bool finished, void *context);
 static void flyInFinishedTimerCallback(void *callback_data);
 static void flyOutFinishedTimerCallback(void *callback_data);
 static void rotationTimerCallback(void *callback_data);
-
-static DuckAnimation* getAnimation(uint16_t minute, SCENE scene);
-static DuckAnimation* getDiveAnimation(uint16_t minute);
-static DuckAnimation* getFlyInAnimation(uint16_t minute);
-static DuckAnimation* getFlyOutAnimation(uint16_t minute);
-static void DisableAnimations(DuckAnimation *duckAnimation);
-static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute);
-static bool isAnimationInProgress();
 static uint32_t calcDegreeDiff(int32_t startDegree, int32_t endDegree, bool rotateCW);
 
 static DuckAnimation _duckDiveAnimation[DIVE_POSITIONS] = {
@@ -144,17 +143,17 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t
   bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
   
-  // Reset exited flag at minute 0
-  if (minute == 0) {
-    data->exited = false;
-  }
-  
   // Exit if animation or rotation already running
   if (isAnimationInProgress()) {
     return;
   }
   
-  DISPLAY_ACTION displayAction = getDisplayAction(minute, second, data->scene, firstDisplay);
+  // Duck always comes back at minute 0 in shark scene. Reset exited flag.
+  if (minute == 0) {
+    data->exited = false;
+  }
+  
+  DISPLAY_ACTION displayAction = getDisplayAction(data, minute, second, firstDisplay);
   DuckAnimation *duckAnimation = NULL;
   if (displayAction == DISPLAY_NONE) {
     // Hide layer and exit if not displaying content
@@ -177,7 +176,7 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t
   
   // If first display or minute zero and we're not doing the fly-in, don't do animations.
   if ((firstDisplay || minute == 0) && displayAction != DISPLAY_FLY_IN) {
-    DisableAnimations(duckAnimation);
+    disableAnimations(duckAnimation);
   }
   
   _animation = runAnimation(data, duckAnimation, minute);
@@ -223,11 +222,9 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
       return;
     }
     
-    if (flyInMinute == -1) {
-      // Set that duck is not coming back.
-      data->exited = true;
-      
-    } else {
+    // Set whether duck is coming back.
+    data->exited = (flyInMinute == -1);
+    if (flyInMinute >= 0) {
       data->flyInReturnMinute = flyInMinute;
     }
     
@@ -301,7 +298,6 @@ static PropertyAnimation* runAnimation(DuckLayerData *data, DuckAnimation *duckA
 static DuckAnimation* getAnimation(uint16_t minute, SCENE scene) {
   uint32_t duckResourceId = getDuckResourceId(minute, scene);
   if (duckResourceId == 0) {
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "getAnimation called with no image to display");
     return NULL;
   }
   
@@ -325,7 +321,6 @@ static DuckAnimation* getAnimation(uint16_t minute, SCENE scene) {
 
 static DuckAnimation* getDiveAnimation(uint16_t minute) {
   if (minute < BEGIN_DIVE_MINUTE) {
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "getDiveAnimation called with invalid minute %u", minute);
     return NULL;
   }
   
@@ -394,6 +389,34 @@ static DuckAnimation* getFlyOutAnimation(uint16_t minute) {
   return duckAnimation;
 }
 
+static DISPLAY_ACTION getDisplayAction(DuckLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay) {
+  // Check if duck already exited (eaten or got away) due to shark or is past the shark eat duck minute.
+  if (data->exited || (data->scene == FRIDAY13 && minute >= SHARK_SCENE_HIDE_DUCK_MINUTE)) {
+    return DISPLAY_NONE;
+  }
+  
+  if (data->scene == THANKSGIVING) {
+    return DISPLAY_ANIMATION;
+  }
+  
+  // Check for duck diving sequence
+  if (minute >= BEGIN_DIVE_MINUTE) {
+    return DISPLAY_DIVE;
+  }
+  
+  // At first display or minute zero check for fly-in animation
+  if (firstDisplay || minute == 0) {
+    
+    // Do the fly-in animation if the scene criteria are met and it's not too late in the
+    // current minute to perform the animation.
+    if ((isSharkSceneControl(data->scene, minute) == false) && (second <= FLY_IN_CUTOFF_SECOND)) {
+      return DISPLAY_FLY_IN;
+    }
+  }
+  
+  return DISPLAY_ANIMATION;
+}
+
 static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
   uint32_t resourceId = 0;
   
@@ -413,46 +436,11 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
       break;
     
     default:
-      if (minute > BEGIN_DIVE_MINUTE) {
-        // Note: The first minute of the dive sequence is the DUCK_LEFT image that rotates.
-        resourceId = RESOURCE_ID_IMAGE_DUCK_DIVE;
-        
-      } else {
-        resourceId = isMovingRight(minute) ? RESOURCE_ID_IMAGE_DUCK : RESOURCE_ID_IMAGE_DUCK_LEFT;
-      }
-      
+      resourceId = isMovingRight(minute) ? RESOURCE_ID_IMAGE_DUCK : RESOURCE_ID_IMAGE_DUCK_LEFT;
       break;
   }
   
   return resourceId;
-}
-
-static DISPLAY_ACTION getDisplayAction(uint16_t minute, uint16_t second, SCENE scene, bool firstDisplay) {
-  if (scene == THANKSGIVING) {
-    return DISPLAY_ANIMATION;
-  }
-  
-  // Nothing to display for Friday the 13th starting at minute SHARK_SCENE_HIDE_DUCK_MINUTE
-  if (scene == FRIDAY13 && minute >= SHARK_SCENE_HIDE_DUCK_MINUTE) {
-    return DISPLAY_NONE;
-  }
-  
-  // Check for duck diving sequence
-  if (minute >= BEGIN_DIVE_MINUTE) {
-    return DISPLAY_DIVE;
-  }
-  
-  // At first display or minute zero check for fly-in animation
-  if (firstDisplay || minute == 0) {
-    
-    // Do the fly-in animation if the scene criteria are met and it's not too late in the
-    // current minute to perform the animation.
-    if ((isSharkSceneControl(scene, minute) == false) && (second <= FLY_IN_CUTOFF_SECOND)) {
-      return DISPLAY_FLY_IN;
-    }
-  }
-  
-  return DISPLAY_ANIMATION;
 }
 
 static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute) {
@@ -468,22 +456,22 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
     return false;
   }
   
-  // If shark eat duck minute, fly duck out with no fly in.
-  if (isSharkSceneControl(data->scene, minute)) {
-    return true;
-  }
-  
-  // No flying while diving
-  if (minute >= BEGIN_DIVE_MINUTE) {
-    return false;
-  }
-  
   // Calculate landing time
   uint32_t landingMilliSecond = (second * 1000) + FLY_OUT_DURATION + FLY_OUT_IN_DELAY + FLY_IN_DURATION;
-  
-  // Fly out but don't come back if landing comes in shark eats duck window.
-  if (landingMilliSecond >= 60000 && data->scene == FRIDAY13 && minute == (SHARK_SCENE_EAT_MINUTE - 1)) {
-    return true;
+   
+  if (data->scene == FRIDAY13) {
+    // If shark eat duck minute, fly duck out with no fly in.
+    if (minute == SHARK_SCENE_EAT_MINUTE) {
+      return true;
+    }
+
+    // If landing comes in shark eat duck minute, fly duck out with no fly in.
+    if (landingMilliSecond >= 60000 && minute == (SHARK_SCENE_EAT_MINUTE - 1)) {
+      return true;
+    }
+  } else if (minute >= BEGIN_DIVE_MINUTE) {
+    // No flying while diving
+    return false;
   }
   
   // Don't fly out if landing time falls in the dive sequence.
@@ -491,12 +479,13 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
     return false;
   }
   
-  //  Don't let animations occur if fly-in landing occurs when water is rising.
+  // Don't fly out if landing occurs when water is rising. Also covers the case
+  // of the hour change when the duck already flies in at minute zero.
   if (landingMilliSecond >= 59000 && landingMilliSecond < 61000) {
     return false;
   }
   
-  *flyInMinute = (landingMilliSecond >= 60000) ? minute + 1: minute;
+  *flyInMinute = (landingMilliSecond >= 60000) ? (minute + 1) % 60: minute;
   return true;
 }
 
@@ -508,7 +497,7 @@ static bool isAnimationInProgress() {
   return (_animation != NULL || _rotationTimer != NULL || _flyInTimer != NULL || _flyOutTimer != NULL);
 }
 
-static void DisableAnimations(DuckAnimation *duckAnimation) {
+static void disableAnimations(DuckAnimation *duckAnimation) {
   duckAnimation->duration = 0;
   duckAnimation->rotation.increment = 0;
 }
@@ -604,7 +593,7 @@ static void flyInFinishedTimerCallback(void *callback_data) {
     return;
   }
 
-  DisableAnimations(duckAnimation);
+  disableAnimations(duckAnimation);
   _animation = runAnimation(data, duckAnimation, data->lastUpdateMinute);
   free(duckAnimation);
 }
@@ -618,7 +607,7 @@ static void flyOutFinishedTimerCallback(void *callback_data) {
 
   DuckLayerData *data = (DuckLayerData*) callback_data;
   
-  // Do not fly in if duck has already exited.
+  // Do not fly in if duck has already exited such as escaping the shark.
   if (data->exited) {
     return;
   }

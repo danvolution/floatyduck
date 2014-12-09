@@ -6,7 +6,7 @@
 #define NOV_27_2014_00_00_00 1417046400
 #define JAN_01_2015_00_00_00 1420070400
   
-#define TEST_COUNT 24
+#define TEST_COUNT 3 // 24
 
 typedef struct {
   time_t startTime;
@@ -24,6 +24,28 @@ TestUnitData* CreateTestUnit() {
         
     uint16_t testIndex = 0;
 
+    // Run up to minute 50
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (45 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 5;
+    _testData[testIndex].endPauseCount = SHARK_ANIMATION_DURATION / 1000;
+    testIndex++;
+    
+    // Run minute 51 and pause for eat minute
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (51 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 0;
+    _testData[testIndex].endPauseCount = 8;
+    testIndex++;
+    
+    // Run up to minute 0 and pause. This lets the exited flag reset and the duck fly in.
+    _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (52 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 8;
+    _testData[testIndex].endPauseCount = 2;
+    testIndex++;
+    
+/*
     // Friday the 13th
     
     // Run up to minute 0 and pause for fly-in
@@ -123,6 +145,7 @@ TestUnitData* CreateTestUnit() {
     _testData[testIndex].stepSeconds = 3660;
     _testData[testIndex].stepCount = 4;
     testIndex++;
+*/
   }
   
   return data;
