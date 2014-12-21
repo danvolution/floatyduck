@@ -280,7 +280,7 @@ static void switchScene(SCENE scene) {
 }
 
 static SCENE getScene(struct tm* now) {
-   if (now->tm_mon == 11 && now->tm_mday == 25) {
+  if (now->tm_mon == 11 && now->tm_mday == 25) {
     return CHRISTMAS;
     
   } else if (now->tm_wday == 5 && now->tm_mday == 13) {

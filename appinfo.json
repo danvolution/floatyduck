@@ -179,7 +179,7 @@
     "shortName": "Floaty Duck",
     "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
     "versionCode": 1,
-    "versionLabel": "1.3",
+    "versionLabel": "1.4",
     "watchapp": {
         "watchface": true
     }
