@@ -456,6 +456,11 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
     return false;
   }
   
+  // Don't fly out if santa animation will run.
+  if (data->scene == CHRISTMAS && minute <= LAST_SANTA_ANIMATION_MINUTE) {
+    return false;
+  }
+  
   // Calculate landing time
   uint32_t landingMilliSecond = (second * 1000) + FLY_OUT_DURATION + FLY_OUT_IN_DELAY + FLY_IN_DURATION;
    

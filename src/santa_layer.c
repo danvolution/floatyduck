@@ -8,14 +8,10 @@
 #define PASS_OFFSET_Y 28
   
 // The highest Y coordinate Santa's fly-by can start.
-#define TOP_PASS_COORDINATE_Y 28
+#define TOP_PASS_COORDINATE_Y 24
   
 // The lowest Y coordinate Santa's fly-by can start.
 #define BOTTOM_PASS_COORDINATE_Y 76
-  
-// The last minute in the hour that Santa will fly. Otherwise he gets 
-// too close to the duck.
-#define LAST_ANIMATION_MINUTE 30
 
 typedef struct {
   uint32_t duration;
@@ -27,7 +23,7 @@ typedef struct {
 
 static PropertyAnimation *_animation = NULL;
 
-static SantaAnimation* getSantaAnimation(uint16_t minute, bool firstDisplay);
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool runNow, bool firstDisplay);
 static void runAnimation(SantaLayerData *data, SantaAnimation *animation);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 
@@ -54,18 +50,13 @@ void DrawSantaLayer(SantaLayerData *data, uint16_t hour, uint16_t minute) {
   bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
   
-  // Exit if time is past LAST_ANIMATION_MINUTE since the water level is too high at this point.
-  if (minute > LAST_ANIMATION_MINUTE) {
-    return;
-  }
-  
   // Exit if animation already running
   if (_animation != NULL) {
     return;
   }
   
   // Check if there is an animation for the current minute. Force animation if watchface just loaded.
-  SantaAnimation *santaAnimation = getSantaAnimation(minute, firstDisplay);
+  SantaAnimation *santaAnimation = getSantaAnimation(minute, firstDisplay, firstDisplay);
   if (santaAnimation == NULL) {
     return;
   }
@@ -79,6 +70,22 @@ void DestroySantaLayer(SantaLayerData *data) {
     DestroyBitmapGroup(&data->santa);
     free(data);
   }  
+}
+
+void HandleTapSantaLayer(SantaLayerData *data, uint16_t hour, uint16_t minute, uint16_t second) {
+  // Exit if animation or rotation already running
+  if (_animation != NULL) {
+    return;
+  }
+  
+  // Force animation on shake.
+  SantaAnimation *santaAnimation = getSantaAnimation(minute, true, false);
+  if (santaAnimation == NULL) {
+    return;
+  }
+
+  runAnimation(data, santaAnimation);
+  free(santaAnimation);
 }
 
 static void runAnimation(SantaLayerData *data, SantaAnimation *santaAnimation) {
@@ -100,14 +107,14 @@ static void runAnimation(SantaLayerData *data, SantaAnimation *santaAnimation) {
   animation_schedule((Animation*) _animation);
 }
 
-static SantaAnimation* getSantaAnimation(uint16_t minute, bool firstDisplay) {
+static SantaAnimation* getSantaAnimation(uint16_t minute, bool runNow, bool firstDisplay) {
   // No animations past LAST_ANIMATION_MINUTE since the water level is too high at this point.
-  if (minute > LAST_ANIMATION_MINUTE) {
+  if (minute > LAST_SANTA_ANIMATION_MINUTE) {
     return NULL;
   }
   
   // Create animation every 5 minutes or if displaying for the first time.
-  if ((minute % 5 != 0) && (firstDisplay == false)) {
+  if ((minute % 5 != 0) && (runNow == false)) {
     return NULL;
   }
   
@@ -119,7 +126,7 @@ static SantaAnimation* getSantaAnimation(uint16_t minute, bool firstDisplay) {
   bool flyRight = (minute % 2 == 0);
   
   // Position Santa's fly-by in the fly zone between y coordinates BOTTOM_PASS_COORDINATE_Y and TOP_PASS_COORDINATE_Y
-  int16_t coordinateY = BOTTOM_PASS_COORDINATE_Y - (BOTTOM_PASS_COORDINATE_Y - TOP_PASS_COORDINATE_Y) * minute / LAST_ANIMATION_MINUTE;
+  int16_t coordinateY = BOTTOM_PASS_COORDINATE_Y - (BOTTOM_PASS_COORDINATE_Y - TOP_PASS_COORDINATE_Y) * minute / LAST_SANTA_ANIMATION_MINUTE;
 
   santaAnimation->resourceId = flyRight ? RESOURCE_ID_IMAGE_SANTA : RESOURCE_ID_IMAGE_SANTA_LEFT;
   santaAnimation->duration = SANTA_ANIMATION_DURATION;

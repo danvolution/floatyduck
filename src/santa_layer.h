@@ -9,3 +9,4 @@ typedef struct {
 SantaLayerData* CreateSantaLayer(Layer *relativeLayer, LayerRelation relation);
 void DrawSantaLayer(SantaLayerData *data, uint16_t hour, uint16_t minute);
 void DestroySantaLayer(SantaLayerData *data);
+void HandleTapSantaLayer(SantaLayerData *data, uint16_t hour, uint16_t minute, uint16_t second);

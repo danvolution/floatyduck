@@ -48,6 +48,7 @@ int main(void) {
 
 static void init() {
   _scene = UNDEFINED_SCENE;
+  srand(time(NULL));
   
 #ifdef RUN_TEST
   _testUnitData = CreateTestUnit();
@@ -143,19 +144,23 @@ static void timer_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 static void tap_handler(AccelAxisType axis, int32_t direction) {
-  if (_duckData != NULL) {
 #ifdef RUN_TEST
-    time_t now = _testUnitData->time;
+  time_t now = _testUnitData->time;
 #else
-    time_t now = time(NULL); 
+  time_t now = time(NULL); 
 #endif
   
-    struct tm* localNow = localtime(&now);
-    uint16_t hour = localNow->tm_hour;
-    uint16_t minute = localNow->tm_min;
-    uint16_t second = localNow->tm_sec;
-    
+  struct tm* localNow = localtime(&now);
+  uint16_t hour = localNow->tm_hour;
+  uint16_t minute = localNow->tm_min;
+  uint16_t second = localNow->tm_sec;
+
+  if (_duckData != NULL) {
     HandleTapDuckLayer(_duckData, hour, minute, second);
+  }
+    
+  if (_santaData != NULL) {
+    HandleTapSantaLayer(_santaData, hour, minute, second);
   }
 }
 
@@ -275,7 +280,7 @@ static void switchScene(SCENE scene) {
 }
 
 static SCENE getScene(struct tm* now) {
-  if (now->tm_mon == 11 && now->tm_mday == 25) {
+   if (now->tm_mon == 11 && now->tm_mday == 25) {
     return CHRISTMAS;
     
   } else if (now->tm_wday == 5 && now->tm_mday == 13) {

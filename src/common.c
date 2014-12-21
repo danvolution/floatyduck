@@ -7,7 +7,7 @@ void AddLayer(Layer *relativeLayer, Layer *newLayer, LayerRelation relation) {
   switch (relation) {
     case ABOVE_SIBLING:
       layer_insert_above_sibling(newLayer, relativeLayer);
-    break;
+      break;
     
     case BELOW_SIBLING:
       layer_insert_below_sibling(newLayer, relativeLayer);

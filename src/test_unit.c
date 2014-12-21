@@ -6,7 +6,7 @@
 #define NOV_27_2014_00_00_00 1417046400
 #define JAN_01_2015_00_00_00 1420070400
   
-#define TEST_COUNT 3 // 24
+#define TEST_COUNT 1 // 24
 
 typedef struct {
   time_t startTime;
@@ -23,7 +23,15 @@ TestUnitData* CreateTestUnit() {
     memset(data, 0, sizeof(TestUnitData));
         
     uint16_t testIndex = 0;
+    
+    
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (52 * 60);
+    _testData[testIndex].stepSeconds = 12;
+    _testData[testIndex].stepCount = 40;
+    _testData[testIndex].endPauseCount = 2;
+    testIndex++;
 
+/*    
     // Run up to minute 50
     _testData[testIndex].startTime = FEB_13_2015_00_00_00 + (45 * 60);
     _testData[testIndex].stepSeconds = 60;
@@ -44,7 +52,8 @@ TestUnitData* CreateTestUnit() {
     _testData[testIndex].stepCount = 8;
     _testData[testIndex].endPauseCount = 2;
     testIndex++;
-    
+*/    
+
 /*
     // Friday the 13th
     

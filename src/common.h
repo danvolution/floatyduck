@@ -1,7 +1,7 @@
 #pragma once
 
 //#define RUN_TEST true
-  
+
 #define SCREEN_WIDTH 144
 #define SCREEN_HEIGHT 168
 
@@ -12,15 +12,20 @@
 #define SHARK_ANIMATION_DURATION 8000
 #define SANTA_ANIMATION_DURATION 10000
 #endif
- 
+
 #define WAVE_HEIGHT 4
 #define WAVE_COUNT 4
-#define SHARK_SCENE_EAT_MINUTE 51
 #define WATER_RISE_DURATION 500
+#define SHARK_SCENE_EAT_MINUTE 51
+
+// The last minute in the hour that Santa will fly. Otherwise he gets 
+// too close to the duck.
+#define LAST_SANTA_ANIMATION_MINUTE 30
+  
 // Delay animations to give the watchface animation to finish when it is first launched.
 #define FIRST_DISPLAY_ANIMATION_DELAY 500
 #define PEBBLE_ANGLE_PER_DEGREE (TRIG_MAX_ANGLE / 360)
-  
+
 // Convert degree to Pebble angle
 #define PEBBLE_ANGLE_FROM_DEGREE(degree) (degree * PEBBLE_ANGLE_PER_DEGREE)
 
