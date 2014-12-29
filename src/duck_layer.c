@@ -17,10 +17,14 @@
 #define FLY_IN_DURATION 1500
 #define FLY_OUT_DURATION 1500
 #define FLY_OUT_IN_DELAY 1000
+#define DIVE_DURATION 1000
   
-// Seconds past the minute that the fly-in animation should not be run.
+// Second past the minute that the fly-in animation should not be run.
 // Otherwise the animation would spill over to the next minute.
 #define FLY_IN_CUTOFF_SECOND 57
+  
+// Second past minute 59 that the bubbles should not start.
+#define BUBBLES_CUTOFF_SECOND 59
   
 // Milliseconds between each rotation increment when duck is starting dive.
 #define ROTATION_INCREMENT_DURATION 50
@@ -51,6 +55,7 @@ static int16_t _duckCoordinateX[HORIZONTAL_POSITIONS] = { 17, 25, 32, 40, 48, 56
 // Pixels to offset the duck in the positive Y direction to make the duck look like
 // it is comfortably sitting on the wave.
 static int16_t _waveOffsetY[HORIZONTAL_POSITIONS] = { 1, 1, 4, 3, 1, 1, 2, 4, 2, 1, 1, 3, 4, 2, 1 };
+static GSize _bubbleOffset = { 8, 12 };
 
 static PropertyAnimation *_animation = NULL;
 static AppTimer *_rotationTimer = NULL;
@@ -82,6 +87,7 @@ static void flyInFinishedTimerCallback(void *callback_data);
 static void flyOutFinishedTimerCallback(void *callback_data);
 static void rotationTimerCallback(void *callback_data);
 static uint32_t calcDegreeDiff(int32_t startDegree, int32_t endDegree, bool rotateCW);
+static void addBubbles(DuckLayerData *data);
 
 static DuckAnimation _duckDiveAnimation[DIVE_POSITIONS] = {
   { 
@@ -89,27 +95,27 @@ static DuckAnimation _duckDiveAnimation[DIVE_POSITIONS] = {
     {0, 300, -5}
   },
   { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 59, 39 }, { 56, 55 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
-    {10, 5, -1}
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 59, 39 }, { 48, 60 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
+    {24, 20, -1}
   },
   { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 56, 55 }, { 50, 65 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
-    {5, 0, -1}
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 48, 60 }, { 38, 82 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
+    {20, 20, 0}
   },
   { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 50, 65 }, { 44, 75 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 38, 82 }, { 32, 105 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
+    {20, 0, -1}
+  },
+  { 
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 32, 105 }, { 28, 130 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
     {0, 0, 0}
   },
   { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 44, 75 }, { 38, 100 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
-    {0, 0, 0}
-  },
-  { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 38, 100 }, { 32, 135 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 28, 130 }, { 24, 155 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
    {0, 0, 0}
   },
   { 
-    RESOURCE_ID_IMAGE_DUCK_DIVE, { 32, 135 }, { 28, 180 }, WATER_RISE_DURATION, 0, AnimationCurveLinear, moveAnimationStopped, 
+    RESOURCE_ID_IMAGE_DUCK_DIVE, { 24, 155 }, { 20, 180 }, DIVE_DURATION, 0, AnimationCurveEaseInOut, moveAnimationStopped, 
     {0, 0, 0}
   }
 };
@@ -118,7 +124,6 @@ DuckLayerData* CreateDuckLayer(Layer* relativeLayer, LayerRelation relation, SCE
   DuckLayerData* data = malloc(sizeof(DuckLayerData));
   if (data != NULL) {
     memset(data, 0, sizeof(DuckLayerData));
-    data->scene = scene;
     data->duck.bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DUCK);
     data->duck.resourceId = RESOURCE_ID_IMAGE_DUCK;
     data->duck.layer = rot_bitmap_layer_create(data->duck.bitmap);
@@ -128,12 +133,18 @@ DuckLayerData* CreateDuckLayer(Layer* relativeLayer, LayerRelation relation, SCE
     data->hidden = false;
     data->lastUpdateMinute = -1;
     data->exited = false;
+    
+    SwitchSceneDuckLayer(data, scene);
   }
   
   return data;
 }
 
 void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t second) {
+  if (data->bubbleData != NULL) {
+    DrawBubbleLayer(data->bubbleData, hour, minute);
+  }
+  
   // Exit if this minute has already been handled.
   if (data->lastUpdateMinute == minute) {
     return;
@@ -200,12 +211,27 @@ void DestroyDuckLayer(DuckLayerData* data) {
   }
   
   if (data != NULL) {    
+    if (data->bubbleData != NULL) {
+      DestroyBubbleLayer(data->bubbleData);    
+      data->bubbleData = NULL;
+    }
+    
     DestroyRotBitmapGroup(&data->duck);
     free(data);
   }
 }
 
 void SwitchSceneDuckLayer(DuckLayerData* data, SCENE scene) {
+  bool bubbleLayer = (scene == CHRISTMAS || scene == DUCK);
+  
+  if (bubbleLayer == true && data->bubbleData == NULL) {
+    data->bubbleData = CreateBubbleLayer((Layer*) data->duck.layer, ABOVE_SIBLING);
+    
+  } else if (bubbleLayer == false && data->bubbleData != NULL) {
+    DestroyBubbleLayer(data->bubbleData);
+    data->bubbleData = NULL;
+  }
+  
   data->scene = scene;
 }
 
@@ -230,6 +256,10 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
     
     _animation = runAnimation(data, duckAnimation, minute);
     free(duckAnimation);
+    
+  } else if ((minute == 59 && second >= BUBBLES_CUTOFF_SECOND) == false) {
+    // Don't add bubbles if hour is about to change.
+    addBubbles(data);
   }
 }
 
@@ -565,6 +595,10 @@ static bool isMovingRight(uint16_t minute) {
 static void moveAnimationStopped(Animation *animation, bool finished, void *context) {
   property_animation_destroy(_animation);
   _animation = NULL;
+  
+  if (finished) {
+    addBubbles((DuckLayerData*) context);
+  }
 }
 
 static void flyInAnimationStopped(Animation *animation, bool finished, void *context) {
@@ -658,4 +692,17 @@ static uint32_t calcDegreeDiff(int32_t startDegree, int32_t endDegree, bool rota
   }
   
   return diff;
+}
+
+static void addBubbles(DuckLayerData *data) {
+  if (data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE && data->bubbleData != NULL) {
+    GRect frame = layer_get_frame((Layer*) data->duck.layer);
+    GPoint centerPoint = grect_center_point(&frame);
+    centerPoint.x += _bubbleOffset.w;
+    centerPoint.y += _bubbleOffset.h; 
+    AddBubble(data->bubbleData, centerPoint, 1, 4, 0);
+    AddBubble(data->bubbleData, centerPoint, 2, 3, 1);
+    AddBubble(data->bubbleData, centerPoint, 1, 3, 2);
+    AddBubble(data->bubbleData, centerPoint, 2, 4, 4);
+  }
 }

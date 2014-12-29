@@ -1,28 +1,30 @@
 #include <pebble.h>
 #include "bubble_layer.h"
 
-#define BUBBLE_CLUSTERS 5
-#define BUBBLES_PER_CLUSTER 3
-#define BEGIN_BUBBLES_MINUTE 55
+#define MAX_BUBBLES 16
+#define BUBBLE_TIMER_INTERVAL 100
+#define WIGGLE_COUNT 16
 
 typedef struct {
   GPoint origin;
   uint16_t size;
+  uint16_t speed;
+  uint16_t delayStartIntervals;
 } Bubble;
 
-static Bubble _bubbles[BUBBLE_CLUSTERS][BUBBLES_PER_CLUSTER] = {
-  { {{38, 21}, 1}, {{43, 21}, 2}, {{35, 29}, 1} },
-  { {{34, 41}, 1}, {{29, 43}, 2}, {{34, 58}, 1} },
-  { {{28, 65}, 2}, {{28, 70}, 1}, {{32, 88}, 1} },
-  { {{23, 101}, 1}, {{26, 103}, 1}, {{25, 114}, 1} },
-  { {{23, 128}, 2}, {{24, 133}, 1}, {{21, 140}, 1} } 
-};
+static int16_t _wiggles[WIGGLE_COUNT] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, -2, 2 };
 
-static uint16_t _currentMinute = 0;
-static AppTimer *_timer = NULL;
+static Bubble _bubbles[MAX_BUBBLES];
+static AppTimer *_bubbleTimer = NULL;
+static int16_t _lastUpdateMinute = -1;
+static volatile bool _updateBubbles = false;
+static uint16_t _bubbleStartIndex = 0;
+static uint16_t _bubbleEndIndex = 0;
 
 static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx);
-static void timerCallback(void *callback_data);
+static void bubbleTimerCallback(void *callback_data);
+static int16_t getBubbleWiggle(uint16_t size);
+static bool isBufferFull(uint16_t start, uint16_t end, uint16_t size);
 
 BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation) {
   BubbleLayerData* data = malloc(sizeof(BubbleLayerData));
@@ -43,25 +45,14 @@ void DrawBubbleLayer(BubbleLayerData* data, uint16_t hour, uint16_t minute) {
     return;
   }
   
-  // Remember whether first time called.
-  bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
-
-  if (minute < BEGIN_BUBBLES_MINUTE || firstDisplay) {
-    _currentMinute = minute;
-    layer_mark_dirty(data->layer);  
-    return;
-  }
-  
-  // Delay layer update by the water rise animation duration.
-  data->nextMinute = minute;
-  _timer = app_timer_register(WATER_RISE_DURATION, (AppTimerCallback) timerCallback, (void*) data);
+  _lastUpdateMinute = minute;
 }
 
 void DestroyBubbleLayer(BubbleLayerData* data) {
-  if (_timer != NULL) {
-    app_timer_cancel(_timer);
-    _timer = NULL;
+  if (_bubbleTimer != NULL) {
+    app_timer_cancel(_bubbleTimer);
+    _bubbleTimer = NULL;
   }
   
   if (data != NULL) {
@@ -74,24 +65,105 @@ void DestroyBubbleLayer(BubbleLayerData* data) {
   }
 }
 
-static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx) {
-  if (_currentMinute < BEGIN_BUBBLES_MINUTE) {
+void AddBubble(BubbleLayerData* data, GPoint startOrigin, uint16_t size, uint16_t speed, uint16_t delayStart) {
+  uint16_t start = _bubbleStartIndex;
+  uint16_t end = _bubbleEndIndex;
+  
+  if (isBufferFull(start, end, MAX_BUBBLES)) {
     return;
   }
+
+  _bubbles[end].origin = startOrigin;
+  _bubbles[end].size = size;
+  _bubbles[end].speed = speed;
+  _bubbles[end].delayStartIntervals = delayStart;
+
+  end++;
+  if (end == MAX_BUBBLES) {
+    end = 0;
+  }
   
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  _bubbleEndIndex = end;
   
-  for (int minute = BEGIN_BUBBLES_MINUTE; minute <= _currentMinute; minute++) {
-    for (int bubble = 0; bubble < BUBBLES_PER_CLUSTER; bubble++) {
-      graphics_fill_circle(ctx, _bubbles[minute - BEGIN_BUBBLES_MINUTE][bubble].origin, 
-                           _bubbles[minute - BEGIN_BUBBLES_MINUTE][bubble].size);
-    }
+  if (_bubbleTimer == NULL) {
+    _bubbleTimer = app_timer_register(BUBBLE_TIMER_INTERVAL, (AppTimerCallback) bubbleTimerCallback, (void*) data);
   }
 }
 
-static void timerCallback(void *callback_data) {
-  _timer = NULL;
+static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx) {
+  uint16_t start = _bubbleStartIndex;
+  uint16_t end = _bubbleEndIndex;
+
+  if (start == end || _lastUpdateMinute == -1) {
+    return;
+  }
+  
+  uint16_t index = start;
+  bool updateBubbles = _updateBubbles;
+  _updateBubbles = false;
+
+  int16_t waterTop = WATER_TOP(_lastUpdateMinute);
+  
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  
+  // Iterate through bubbles and move them by speed pixels. Remove any that have floated all
+  // the way to the top.
+  while (index != end) {
+    if (_bubbles[index].delayStartIntervals > 0) {
+      _bubbles[index].delayStartIntervals--;
+      
+    } else {
+      if (updateBubbles) {
+        _bubbles[index].origin.y -= _bubbles[index].speed;
+        _bubbles[index].origin.x += getBubbleWiggle(_bubbles[index].size);
+      }
+        
+      if (_bubbles[index].origin.y < waterTop) {
+        // Bubble now has reached the top. Move the start if this bubble is at the head.
+        // Otherwise it will have to wait until the bubble(s) before it hit the top.
+        if (index == start) {
+          start = index + 1;
+          if (start == MAX_BUBBLES) {
+            start = 0;
+          }
+        }
+      } else {
+        graphics_fill_circle(ctx, _bubbles[index].origin, _bubbles[index].size);
+      }
+    }
+    
+    index++;
+    if (index == MAX_BUBBLES) {
+      index = 0;
+    }
+  }
+  
+  _bubbleStartIndex = start;
+}
+
+static void bubbleTimerCallback(void *callback_data) {
+  _bubbleTimer = NULL;
   BubbleLayerData *data = (BubbleLayerData*) callback_data;
-  _currentMinute = data->nextMinute;
+  
+  uint16_t start = _bubbleStartIndex;
+  uint16_t end = _bubbleEndIndex;
+  if (start != end) {
+    _bubbleTimer = app_timer_register(BUBBLE_TIMER_INTERVAL, (AppTimerCallback) bubbleTimerCallback, (void*) data);
+  }
+
+  _updateBubbles = true;
   layer_mark_dirty(data->layer);  
+}
+
+static int16_t getBubbleWiggle(uint16_t size) {
+  uint16_t index = rand() % WIGGLE_COUNT;
+  return _wiggles[index];
+}
+
+static bool isBufferFull(uint16_t start, uint16_t end, uint16_t size) {
+  if ((end + 1) == start || (start == 0 && end == (size - 1))) {
+    return true;
+  }
+  
+  return false;
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "bubble_layer.h"
   
 typedef struct {
   RotBitmapGroup duck;
@@ -8,6 +9,7 @@ typedef struct {
   int16_t lastUpdateMinute;
   uint16_t flyInReturnMinute;
   bool exited;
+  BubbleLayerData *bubbleData;
 } DuckLayerData;
 
 DuckLayerData* CreateDuckLayer(Layer *relativeLayer, LayerRelation relation, SCENE scene);

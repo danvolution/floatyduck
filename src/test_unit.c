@@ -6,7 +6,7 @@
 #define NOV_27_2014_00_00_00 1417046400
 #define JAN_01_2015_00_00_00 1420070400
   
-#define TEST_COUNT 1 // 24
+#define TEST_COUNT 24
 
 typedef struct {
   time_t startTime;
@@ -24,12 +24,23 @@ TestUnitData* CreateTestUnit() {
         
     uint16_t testIndex = 0;
     
-    
-    _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (52 * 60);
-    _testData[testIndex].stepSeconds = 12;
-    _testData[testIndex].stepCount = 40;
-    _testData[testIndex].endPauseCount = 2;
+/*
+    _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (58 * 60);
+    _testData[testIndex].stepSeconds = 0;
+    _testData[testIndex].stepCount = 30;
+    _testData[testIndex].endPauseCount = 15;
     testIndex++;
+*/
+    
+/*
+    for (int index = 0; index < 20; index++) {
+      _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (3 * index * 60);
+      _testData[testIndex].stepSeconds = 0;
+      _testData[testIndex].stepCount = 0;
+      _testData[testIndex].endPauseCount = 15;
+      testIndex++;
+    }
+*/
 
 /*    
     // Run up to minute 50
@@ -54,7 +65,7 @@ TestUnitData* CreateTestUnit() {
     testIndex++;
 */    
 
-/*
+
     // Friday the 13th
     
     // Run up to minute 0 and pause for fly-in
@@ -154,7 +165,7 @@ TestUnitData* CreateTestUnit() {
     _testData[testIndex].stepSeconds = 3660;
     _testData[testIndex].stepCount = 4;
     testIndex++;
-*/
+
   }
   
   return data;

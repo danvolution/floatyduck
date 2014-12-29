@@ -5,7 +5,6 @@
 #include "water_layer.h"
 #include "waves_layer.h"
 #include "duck_layer.h"
-#include "bubble_layer.h"
 #include "shark_layer.h"
 #include "santa_layer.h"
   
@@ -19,7 +18,6 @@ static HourLayerData* _hourData = NULL;
 static WaterLayerData* _waterData = NULL;
 static WavesLayerData* _wavesData = NULL;
 static DuckLayerData* _duckData = NULL;
-static BubbleLayerData* _bubbleData = NULL;
 static SharkLayerData* _sharkData = NULL;
 static SantaLayerData* _santaData = NULL;
 
@@ -115,11 +113,6 @@ static void main_window_unload(Window *window) {
     DestroySharkLayer(_sharkData);    
     _sharkData = NULL;
   }
-
-  if (_bubbleData != NULL) {
-    DestroyBubbleLayer(_bubbleData);    
-    _bubbleData = NULL;
-  }
   
   if (_duckData != NULL) {
     DestroyDuckLayer(_duckData);
@@ -194,10 +187,6 @@ static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t seco
     DrawDuckLayer(_duckData, hour, minute, second);
   }
   
-  if (_bubbleData != NULL) {
-    DrawBubbleLayer(_bubbleData, hour, minute);
-  }
-  
   if (_sharkData != NULL) {
     DrawSharkLayer(_sharkData, hour, minute, second);
   }
@@ -209,7 +198,6 @@ static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t seco
 
 static void switchScene(SCENE scene) {
   bool duckLayer = false;
-  bool bubbleLayer = false;
   bool sharkLayer = false;
   bool santaLayer = false;
   
@@ -217,12 +205,10 @@ static void switchScene(SCENE scene) {
     case CHRISTMAS:
       santaLayer = true;
       duckLayer = true;
-      bubbleLayer = true;
       break;
     
     case DUCK:
       duckLayer = true;
-      bubbleLayer = true;
       break;
     
     case FRIDAY13:
@@ -250,14 +236,6 @@ static void switchScene(SCENE scene) {
   } else if (duckLayer == false && _duckData != NULL) {
     DestroyDuckLayer(_duckData);
     _duckData = NULL;
-  }
-  
-  if (bubbleLayer == true && _bubbleData == NULL) {
-    _bubbleData = CreateBubbleLayer((Layer*) _waterData->inverterLayer, BELOW_SIBLING);
-    
-  } else if (bubbleLayer == false && _bubbleData != NULL) {
-    DestroyBubbleLayer(_bubbleData);
-    _bubbleData = NULL;
   }
   
   if (sharkLayer == true && _sharkData == NULL) {
