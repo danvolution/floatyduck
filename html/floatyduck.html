@@ -1,56 +1,54 @@
 <!DOCTYPE html> 
-<html>
+<html lang="en-US">
   <head>
     <title>Floaty Duck Settings</title>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
     <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
     <script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
   </head>
-  
+
   <body>
     <div data-role="page">
-
       <div data-role="header">
         <h1 style="margin:0% 10%;">Floaty Duck Settings</h1>
+        <!-- PayPal -->
+        <div style="margin-bottom:7px;text-align:center;">
+          <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+            <input type="hidden" name="cmd" value="_s-xclick">
+            <input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
+            ">
+            <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+            <img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
+          </form>
+        </div><!-- /PayPal -->
       </div><!-- /header -->
-      
-      <!-- PayPal -->
-      <div style="margin-top:10px;text-align:center;">
-        <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
-          <input type="hidden" name="cmd" value="_s-xclick">
-          <input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
-          ">
-          <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
-          <img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
-        </form>
-      </div><!-- /PayPal -->
-      
+
       <div role="main" class="ui-content">
-        
         <div id="new_version_section" class="ui-bar ui-bar-a ui-corner-all" style="display:none;">
           <p style="text-align:center;">New version available!</p>
         </div>
-        
+
         <div class="ui-field-contain">
           <label for="hour_vibrate_select">Quack on the hour:</label>
-          <select id="hour_vibrate_select" data-role="flipswitch" data-mini="false">
-              <option value=0 selected="">Off</option>
-              <option value=1>On</option>
-          </select>
+          <select id="hour_vibrate_select" data-role="flipswitch" data-mini="true">
+            <option value="0" selected>Off</option>
+            <option value="1">On</option>
+          </select>
 
           <div id="hour_vibrate_hours_section" style="display: none;">
             <div class="ui-grid-a">
               <div class="ui-block-a">
                 <fieldset class="ui-field-contain" style="margin-left:5px;margin-right:5px;">
-                  <label for="hour_vibrate_start_select">Start hour</label>
+                  <label for="hour_vibrate_start_select">Start:</label>
                   <select name="hour_vibrate_start_select" id="hour_vibrate_start_select" data-mini="true">
                   </select>
                 </fieldset>
               </div>
               <div class="ui-block-b">
                 <fieldset class="ui-field-contain" style="margin-left:5px;margin-right:5px;">
-                  <label for="hour_vibrate_end_select">End hour</label>
+                  <label for="hour_vibrate_end_select">End:</label>
                   <select name="hour_vibrate_end_select" id="hour_vibrate_end_select" data-mini="true">
                   </select>
                 </fieldset>
@@ -61,31 +59,31 @@
 
         <div class="ui-field-contain">
           <label for="bluetooth_vibrate_select">Quack on Bluetooth disconnect:</label>
-          <select id="bluetooth_vibrate_select" data-role="flipswitch" data-mini="false">
-              <option value=0 selected="">Off</option>
-              <option value=1>On</option>
-          </select>
+          <select id="bluetooth_vibrate_select" data-role="flipswitch" data-mini="true">
+            <option value="0" selected>Off</option>
+            <option value="1">On</option>
+          </select>
         </div>
-        
+
         <div class="ui-field-contain">
           <label for="shark_vibrate_select">Quack when Floaty Duck needs your help on Friday the 13th:</label>
-          <select id="shark_vibrate_select" data-role="flipswitch" data-mini="false">
-              <option value=0 selected="">Off</option>
-              <option value=1>On</option>
-          </select>
+          <select id="shark_vibrate_select" data-role="flipswitch" data-mini="true">
+            <option value="0" selected>Off</option>
+            <option value="1">On</option>
+          </select>
 
           <div id="shark_vibrate_hours_section" style="display: none;">
             <div class="ui-grid-a">
               <div class="ui-block-a">
                 <fieldset class="ui-field-contain" style="margin-left:5px;margin-right:5px;">
-                  <label for="shark_vibrate_start_select">Start hour</label>
+                  <label for="shark_vibrate_start_select">Start:</label>
                   <select name="shark_vibrate_start_select" id="shark_vibrate_start_select" data-mini="true">
                   </select>
                 </fieldset>
               </div>
               <div class="ui-block-b">
                 <fieldset class="ui-field-contain" style="margin-left:5px;margin-right:5px;">
-                  <label for="shark_vibrate_end_select">End hour</label>
+                  <label for="shark_vibrate_end_select">End:</label>
                   <select name="shark_vibrate_end_select" id="shark_vibrate_end_select" data-mini="true">
                   </select>
                 </fieldset>
@@ -93,35 +91,43 @@
             </div><!-- /grid-a -->
           </div>
         </div>
-        
+
         <div class="ui-field-contain">
           <label for="scene_select">Miss a scene or want to see what is coming up? Select the scene of your choice:</label>
-          <select id="scene_select" data-role="flipswitch" data-mini="false">
-              <option value=0 selected="">Off</option>
-              <option value=1>On</option>
-          </select>
-        
+          <select id="scene_select" data-role="flipswitch" data-mini="true">
+            <option value="0" selected>Off</option>
+            <option value="1">On</option>
+          </select>
+
           <div id="scene_section" style="display: none;">
             <div data-role="fieldcontain">
-              <fieldset data-role="controlgroup">
-                <input type="radio" name="scene_override" id="thanksgiving" value=2 />
+              <fieldset data-role="controlgroup" data-mini="true">
+                <input type="radio" name="scene_override" id="thanksgiving" value="2" />
                 <label for="thanksgiving" id="thanksgiving_label">Thanksgiving</label>
-                <input type="radio" name="scene_override" id="christmas" value=3 />
+                <input type="radio" name="scene_override" id="christmas" value="3" />
                 <label for="christmas" id="christmas_label">Christmas</label>
-                <input type="radio" name="scene_override" id="friday13th" value=4 />
+                <input type="radio" name="scene_override" id="friday13th" value="4" />
                 <label for="friday13th" id="friday13th_label">Friday the 13th</label>
               </fieldset>
             </div>
           </div>
         </div>
-        
+
       </div><!-- /content -->
-      
-      <div data-role="footer" style="text-align:center;" data-position="fixed">
-        <a href="#" id="button_cancel" class="ui-btn ui-corner-all ui-shadow ui-icon-delete ui-btn-icon-left">Cancel</a>
-        <a href="#" id="button_save" class="ui-btn ui-corner-all ui-shadow ui-icon-check ui-btn-icon-left">Save</a>
+
+      <div data-role="footer" data-position="fixed" style="overflow:hidden;">
+        <div data-role="navbar">
+          <ul>
+            <li>
+              <a href="#" id="button_cancel" class="ui-btn ui-shadow ui-icon-delete ui-btn-icon-left">Cancel</a>
+            </li>
+            <li>
+              <a href="#" id="button_save" class="ui-btn ui-shadow ui-icon-check ui-btn-icon-left ui-btn-active">Save</a>
+            </li>
+          </ul>
+        </div><!-- /navbar -->
       </div><!-- /footer -->
-      
+
     </div><!-- /page -->
 
     <script>    
@@ -144,7 +150,7 @@
       var Labels24Hour = [ "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", 
                            "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", 
                            "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00" ];
-      
+
       $().ready(function() {
         // Check for newer version
         var installedVersion = getURLVariableInt("installedVersion", 0);
@@ -152,10 +158,10 @@
           var newVersionSection = document.getElementById("new_version_section");
           newVersionSection.style.display = "block";
         }
-       
+
         // Get 24-hour clock format
         var clock24Hour = getURLVariableInt("clock24Hour", 0);
-        
+
         // Initialize hourly vibrate
         var hourVibrate = initializeFlipSwitch("hourVibrate", "hour_vibrate_select", 0);
         if (hourVibrate == 1) {
@@ -168,10 +174,10 @@
         var hourVibrateEnd = getURLVariableInt("hourVibrateEnd", 18);
         setSelectControlHours("hour_vibrate_start_select", (clock24Hour == 1), hourVibrateStart);
         setSelectControlHours("hour_vibrate_end_select", (clock24Hour == 1), hourVibrateEnd);
-        
+
         // Initialize Bluetooth vibrate
         initializeFlipSwitch("bluetoothVibrate", "bluetooth_vibrate_select", 1);
-        
+
         // Initialize shark vibrate
         var sharkVibrate = initializeFlipSwitch("sharkVibrate", "shark_vibrate_select", 1);
         if (sharkVibrate == 1) {
@@ -190,59 +196,59 @@
         var sceneLabel;
         if (sceneOverride >= Scene.thanksgivingScene && sceneOverride <= Scene.friday13Scene) {
           // Turn scene switch on
-          $("#scene_select").val(1);
+          $("#scene_select").val("1");
           $("#scene_select").parent().addClass("ui-flipswitch-active");
-          
+
           // Get the label for the selected scene
           switch (sceneOverride) {
             case Scene.christmasScene:
               sceneLabel = "christmas_label";
               break;
-              
+
             case Scene.friday13Scene:
               sceneLabel = "friday13th_label";
               break;
-              
+
             case Scene.thanksgivingScene:
             default:
               sceneLabel = "thanksgiving_label";
               break;
           }
-          
+
           // Show scene section
           var sceneSection = document.getElementById("scene_section");
           sceneSection.style.display = "block";
-          
+
         } else {
           // Default scene to Thanksgiving
           sceneOverride = Scene.thanksgivingScene
           sceneLabel = "thanksgiving_label";
         }
-        
+
         // Set the checked property of the selected scene and manually set the jquery classes.
-        $("input[name='scene_override'][value=" + sceneOverride + "]").prop("checked", "checked");
+        $("input[name='scene_override'][value='" + sceneOverride + "']").prop("checked", "checked");
         $("#" + sceneLabel).addClass("ui-radio-on");
         $("#" + sceneLabel).removeClass("ui-radio-off");
       });
-      
+
       $("#hour_vibrate_select").change(function(event) {
         var hourVibrateSelect = document.getElementById("hour_vibrate_select");
         var hoursSection = document.getElementById("hour_vibrate_hours_section");
         hoursSection.style.display = (hourVibrateSelect.options[hourVibrateSelect.selectedIndex].value == 1) ? "block" : "none";
       });
-      
+
       $("#shark_vibrate_select").change(function(event) {
         var sharkVibrateSelect = document.getElementById("shark_vibrate_select");
         var sharkSection = document.getElementById("shark_vibrate_hours_section");
         sharkSection.style.display = (sharkVibrateSelect.options[sharkVibrateSelect.selectedIndex].value == 1) ? "block" : "none";
       });
-      
+
       $("#scene_select").change(function(event) {
         var sceneSelect = document.getElementById("scene_select");
         var sceneSection = document.getElementById("scene_section");
         sceneSection.style.display = (sceneSelect.options[sceneSelect.selectedIndex].value == 1) ? "block" : "none";
       });
-      
+
       $("#button_cancel").click(function() {
         document.location = "pebblejs://close#";
       });
@@ -252,7 +258,7 @@
         var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(settings));
         document.location = location;
       });
-      
+
       function getSettings() {
         var hourVibrateSelect = document.getElementById("hour_vibrate_select");
         var hourStartSelect = document.getElementById("hour_vibrate_start_select");
@@ -262,7 +268,7 @@
         var sharkVibrateSelect = document.getElementById("shark_vibrate_select");
         var sharkStartSelect = document.getElementById("shark_vibrate_start_select");
         var sharkEndSelect = document.getElementById("shark_vibrate_end_select");
-        
+
         var sceneOverride = 0;
         if (sceneSelect.options[sceneSelect.selectedIndex].value == 1) {
           sceneOverride = $("input:radio[name=scene_override]:checked").val();
@@ -279,47 +285,47 @@
           "sharkVibrateStart" : sharkStartSelect.options[sharkStartSelect.selectedIndex].value,
           "sharkVibrateEnd" : sharkEndSelect.options[sharkEndSelect.selectedIndex].value
         }
-        
+
         return settings;
       };
-      
+
       function initializeFlipSwitch(variableName, switchId, defaultValue) {
         var urlVariable = getURLVariableInt(variableName, defaultValue);
         if (urlVariable == 1) {
-          $("#" + switchId).val(1);
+          $("#" + switchId).val("1");
           $("#" + switchId).parent().addClass("ui-flipswitch-active");
         }
-        
+
         return urlVariable;
       }
-      
+
       function getURLVariable(name, defaultValue) {
         name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
         var regexS = "[\\?&]" + name + "=([^&#]*)",
             regex = new RegExp(regexS),
             results = regex.exec(window.location.href);
-            
+
         if (results == null) {
           return defaultValue;
-          
+
         } else {
           return results[1];
         }
       }
-      
+
       function getURLVariableInt(name, defaultValue) {
         var result = getURLVariable(name, defaultValue);
-        
+
         if (isNaN(result)) {
           result = defaultValue;
-          
+
         } else {
           result = parseInt(result);
         }
 
         return result;
       }
-      
+
       function setSelectControlHours(selectControlName, clock24, selectedValue) {
         var selectControl = document.getElementById(selectControlName);
         var hours = clock24 ? Labels24Hour : Labels12Hour;
@@ -330,7 +336,7 @@
           hourOption.value = i;
           selectControl.options.add(hourOption);
         }
-        
+
         $("#" + selectControlName).val(selectedValue);
         $("#" + selectControlName).selectmenu("refresh", true);
       }
