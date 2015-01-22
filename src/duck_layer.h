@@ -8,6 +8,7 @@ typedef struct {
   bool hidden;
   int16_t lastUpdateMinute;
   uint16_t flyInReturnMinute;
+  uint32_t flyInDelayAnimation;
   bool exited;
   BubbleLayerData *bubbleData;
 } DuckLayerData;

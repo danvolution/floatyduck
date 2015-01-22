@@ -7,10 +7,39 @@
 #include "duck_layer.h"
 #include "shark_layer.h"
 #include "santa_layer.h"
+#include "message_layer.h"
   
 #ifdef RUN_TEST
 #include "test_unit.h"
 #endif
+
+#define KEY_CURRENT_VERSION 0
+#define KEY_INSTALLED_VERSION 1
+#define KEY_HOUR_VIBRATE 2
+#define KEY_HOUR_VIBRATE_START 3
+#define KEY_HOUR_VIBRATE_END 4
+#define KEY_BLUETOOTH_VIBRATE 5
+#define KEY_SCENE_OVERRIDE 6
+#define KEY_CLOCK_24_HOUR 7
+#define KEY_SHARK_VIBRATE 8
+#define KEY_SHARK_VIBRATE_START 9
+#define KEY_SHARK_VIBRATE_END 10
+  
+#define MESSAGE_SETTINGS_DURATION 1500
+#define MESSAGE_BLUETOOTH_DURATION 8000
+
+typedef struct {
+  int32_t currentVersion;
+  int32_t installedVersion;
+  int32_t hourVibrate;
+  int32_t hourVibrateStart;
+  int32_t hourVibrateEnd;
+  int32_t bluetoothVibrate;
+  int32_t sceneOverride;
+  int32_t sharkVibrate;
+  int32_t sharkVibrateStart;
+  int32_t sharkVibrateEnd;
+} Settings;
 
 static Window* _mainWindow = NULL;
 static MarkerLayerData* _markerData = NULL;
@@ -20,12 +49,21 @@ static WavesLayerData* _wavesData = NULL;
 static DuckLayerData* _duckData = NULL;
 static SharkLayerData* _sharkData = NULL;
 static SantaLayerData* _santaData = NULL;
+static MessageLayerData *_messageData = NULL;
 
 #ifdef RUN_TEST
 static TestUnitData* _testUnitData = NULL;
 #endif
-  
-SCENE _scene;
+
+static SCENE _scene;
+static Settings _settings;
+static AppTimer *_messageTimer = NULL;
+static AppTimer *_sharkWarnTimer = NULL;
+
+// Message window strings
+static const char *_settingsReceivedMsg = "Settings received!";
+static const char *_settingsReceivedNewVersionMsg = "Settings received.\nNew version available!";
+static const char *_bluetoothDisconnectMsg = "Bluetooth connection lost!";
 
 static void init();
 static void deinit();
@@ -33,10 +71,24 @@ static void main_window_load(Window *window);
 static void main_window_unload(Window *window);
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed);
 static void tap_handler(AccelAxisType axis, int32_t direction);
-static void drawWatchFace();
+static void bluetooth_service_handler(bool connected);
+static void inbox_received_callback(DictionaryIterator *iterator, void *context);
+static void inbox_dropped_callback(AppMessageResult reason, void *context);
+static void outbox_sent_callback(DictionaryIterator *values, void *context);
+static void outbox_failed_callback(DictionaryIterator *failed, AppMessageResult reason, void *context);
+static void loadSettings(Settings *settings);
+static void saveSettings(Settings *settings);
+static int32_t readPersistentInt(const uint32_t key, int32_t defaultValue);
+static bool isHourInRange(int16_t hour, int16_t start, int16_t end);
+static void sendClockStyle();
+static void showMessage(const char *text, uint32_t duration);
+static void messageTimerCallback(void *callback_data);
+static void sharkWarnTimerCallback(void *callback_data);
+static void drawWatchFace(struct tm *tick_time);
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second);
-static SCENE getScene(struct tm* now);
+static SCENE getScene(struct tm *tick_time);
 static void switchScene(SCENE scene);
+static struct tm* getTime(struct tm *real_time);
 
 int main(void) {
   init();
@@ -47,6 +99,7 @@ int main(void) {
 static void init() {
   _scene = UNDEFINED_SCENE;
   srand(time(NULL));
+  loadSettings(&_settings);
   
 #ifdef RUN_TEST
   _testUnitData = CreateTestUnit();
@@ -72,12 +125,35 @@ static void init() {
 
   // Register for accelerometer tap events
   accel_tap_service_subscribe(&tap_handler);
+  
+  // Register bluetooth service
+  bluetooth_connection_service_subscribe(bluetooth_service_handler);
+  
+  // Register AppMessage callbacks
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  
+  // Open AppMessage
+  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 }
 
 static void deinit() {
+  vibes_cancel();
   accel_tap_service_unsubscribe();
   animation_unschedule_all();
-
+  
+  if (_sharkWarnTimer != NULL) {
+    app_timer_cancel(_sharkWarnTimer);
+    _sharkWarnTimer = NULL;
+  }
+  
+  if (_messageTimer != NULL) {
+    app_timer_cancel(_messageTimer);
+    _messageTimer = NULL;
+  }
+  
 #ifdef RUN_TEST
   if (_testUnitData != NULL) {
     DestroyTestUnit(_testUnitData);
@@ -100,10 +176,15 @@ static void main_window_load(Window *window) {
   _waterData = CreateWaterLayer(window_get_root_layer(_mainWindow), CHILD);
   _wavesData = CreateWavesLayer(window_get_root_layer(_mainWindow), CHILD);
   
-  drawWatchFace();
+  drawWatchFace(getTime(NULL));
 }
 
 static void main_window_unload(Window *window) {
+  if (_messageData != NULL) {
+    DestroyMessageLayer(_messageData);
+    _messageData = NULL;
+  }
+  
   if (_santaData != NULL) {
     DestroySantaLayer(_santaData);    
     _santaData = NULL;
@@ -133,17 +214,21 @@ static void main_window_unload(Window *window) {
 }
 
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed) {
-  drawWatchFace();
+  struct tm *localNow = getTime(tick_time);
+  drawWatchFace(localNow);
+  
+#ifndef RUN_TEST
+  // Check for hourly vibrate
+  if ((units_changed & HOUR_UNIT) != 0 && _settings.hourVibrate == 1 &&
+      isHourInRange(localNow->tm_hour, _settings.hourVibrateStart, _settings.hourVibrateEnd)) {
+    
+    vibes_short_pulse();
+  }
+#endif
 }
 
 static void tap_handler(AccelAxisType axis, int32_t direction) {
-#ifdef RUN_TEST
-  time_t now = _testUnitData->time;
-#else
-  time_t now = time(NULL); 
-#endif
-  
-  struct tm* localNow = localtime(&now);
+  struct tm *localNow = getTime(NULL);
   uint16_t hour = localNow->tm_hour;
   uint16_t minute = localNow->tm_min;
   uint16_t second = localNow->tm_sec;
@@ -155,21 +240,275 @@ static void tap_handler(AccelAxisType axis, int32_t direction) {
   if (_santaData != NULL) {
     HandleTapSantaLayer(_santaData, hour, minute, second);
   }
+    
+  if (_sharkData != NULL) {
+    HandleTapSharkLayer(_sharkData, hour, minute, second);
+  }
 }
 
-static void drawWatchFace() {
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  Tuple *tuple = dict_read_first(iterator);
+  
+  // Check for 24-hour format request from phone.
+  if (tuple != NULL && tuple->key == KEY_CLOCK_24_HOUR) {
+    MY_APP_LOG(APP_LOG_LEVEL_INFO, "24-hour format request");
+    sendClockStyle();
+    return;
+  }
+
+  while (tuple != NULL) {
+    switch (tuple->key) {
+      case KEY_CURRENT_VERSION:
+        _settings.currentVersion = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Current version %i", (int) _settings.currentVersion);
+        break;
+      
+      case KEY_INSTALLED_VERSION:
+        _settings.installedVersion = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Installed version %i", (int) _settings.installedVersion);
+        break;
+      
+      case KEY_HOUR_VIBRATE:
+        _settings.hourVibrate = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Hourly vibrate %i", (int) _settings.hourVibrate);
+        break;
+      
+      case KEY_HOUR_VIBRATE_START:
+        _settings.hourVibrateStart = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Hourly vibrate start %i", (int) _settings.hourVibrateStart);
+        break;
+      
+      case KEY_HOUR_VIBRATE_END:
+        _settings.hourVibrateEnd = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Hourly vibrate end %i", (int) _settings.hourVibrateEnd);
+        break;
+      
+      case KEY_BLUETOOTH_VIBRATE:
+        _settings.bluetoothVibrate = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Bluetooth vibrate %i", (int) _settings.bluetoothVibrate);
+        break;
+      
+      case KEY_SCENE_OVERRIDE:
+        _settings.sceneOverride = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Scene override %i", (int) _settings.sceneOverride);
+        break;
+      
+      case KEY_SHARK_VIBRATE:
+        _settings.sharkVibrate = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Shark vibrate %i", (int) _settings.sharkVibrate);
+        break;
+      
+      case KEY_SHARK_VIBRATE_START:
+        _settings.sharkVibrateStart = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Shark vibrate start %i", (int) _settings.sharkVibrateStart);
+        break;
+      
+      case KEY_SHARK_VIBRATE_END:
+        _settings.sharkVibrateEnd = tuple->value->int32;
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Shark vibrate end %i", (int) _settings.sharkVibrateEnd);
+        break;
+      
+      default:
+        MY_APP_LOG(APP_LOG_LEVEL_ERROR, "Key %i not recognized", (int) tuple->key);
+        break;
+    }
+
+    tuple = dict_read_next(iterator);
+  }
+  
+  saveSettings(&_settings);
+  
+  if (_settings.currentVersion > _settings.installedVersion) {
+    showMessage(_settingsReceivedNewVersionMsg, MESSAGE_SETTINGS_DURATION);
+
+  } else {
+    showMessage(_settingsReceivedMsg, MESSAGE_SETTINGS_DURATION);    
+  }
+  
+  drawWatchFace(getTime(NULL));
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+}
+
+static void outbox_sent_callback(DictionaryIterator *values, void *context) {
+  Tuple *tuple = dict_read_first(values);
+  
+  while (tuple != NULL) {
+    switch (tuple->key) {
+      case KEY_CLOCK_24_HOUR:
+        // Record the most recently sent clock format
+        persist_write_int(KEY_CLOCK_24_HOUR, tuple->value->int32);
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Successfully sent clock format %i to phone", (int) tuple->value->int32);
+        break;
+      
+      default:
+        MY_APP_LOG(APP_LOG_LEVEL_ERROR, "Key %i not recognized", (int) tuple->key);
+        break;
+    }
+
+    tuple = dict_read_next(values);
+  }
+}
+
+static void outbox_failed_callback(DictionaryIterator *failed, AppMessageResult reason, void *context) {
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "outbox_failed_callback");
+}
+
+static void bluetooth_service_handler(bool connected) {
+  if (connected == false) {
+    showMessage(_bluetoothDisconnectMsg, MESSAGE_BLUETOOTH_DURATION);
+    if (_settings.bluetoothVibrate) {
+      vibes_short_pulse(); 
+    }
+  }
+}
+
+static void loadSettings(Settings *settings) {
+  settings->currentVersion = readPersistentInt(KEY_CURRENT_VERSION, 0);
+  settings->installedVersion = readPersistentInt(KEY_INSTALLED_VERSION, 0);
+  settings->hourVibrate = readPersistentInt(KEY_HOUR_VIBRATE, 0);
+  settings->hourVibrateStart = readPersistentInt(KEY_HOUR_VIBRATE_START, 9);
+  settings->hourVibrateEnd = readPersistentInt(KEY_HOUR_VIBRATE_END, 18);
+  settings->bluetoothVibrate = readPersistentInt(KEY_BLUETOOTH_VIBRATE, 1);
+  settings->sceneOverride = readPersistentInt(KEY_SCENE_OVERRIDE, UNDEFINED_SCENE);
+  settings->sharkVibrate = readPersistentInt(KEY_SHARK_VIBRATE, 1);
+  settings->sharkVibrateStart = readPersistentInt(KEY_SHARK_VIBRATE_START, 9);
+  settings->sharkVibrateEnd = readPersistentInt(KEY_SHARK_VIBRATE_END, 18);
+  
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: currentVersion=%i, installedVersion=%i",
+             (int) settings->currentVersion, (int) settings->installedVersion);
+  
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: hourVibrate=%i, Start=%i, End=%i",
+             (int) settings->hourVibrate, (int) settings->hourVibrateStart, (int) settings->hourVibrateEnd);
+  
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: bluetoothVibrate=%i, sceneOverride=%i",
+             (int) settings->bluetoothVibrate, (int) settings->sceneOverride);
+  
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: sharkVibrate=%i, Start=%i, End=%i",
+             (int) settings->sharkVibrate, (int) settings->sharkVibrateStart, (int) settings->sharkVibrateEnd);
+}
+
+static int32_t readPersistentInt(const uint32_t key, int32_t defaultValue) {
+  if (persist_exists(key)) {
+    return persist_read_int(key);  
+  }
+  
+  return defaultValue;
+}
+
+static bool isHourInRange(int16_t hour, int16_t start, int16_t end) {
+  if (start == end) {
+    return true;
+    
+  } else if ((end > start) && (hour >= start) && (hour < end)) {
+    return true;
+    
+  } else if ((end < start) && ((hour >= start) || (hour < end))) {
+    return true;
+  }
+  
+  return false;
+}
+
+static void saveSettings(Settings *settings) {
+  persist_write_int(KEY_CURRENT_VERSION, settings->currentVersion);
+  persist_write_int(KEY_INSTALLED_VERSION, settings->installedVersion);
+  persist_write_int(KEY_HOUR_VIBRATE, settings->hourVibrate);
+  persist_write_int(KEY_HOUR_VIBRATE_START, settings->hourVibrateStart);
+  persist_write_int(KEY_HOUR_VIBRATE_END, settings->hourVibrateEnd);
+  persist_write_int(KEY_BLUETOOTH_VIBRATE, settings->bluetoothVibrate);
+  persist_write_int(KEY_SCENE_OVERRIDE, settings->sceneOverride);
+  persist_write_int(KEY_SHARK_VIBRATE, settings->sharkVibrate);
+  persist_write_int(KEY_SHARK_VIBRATE_START, settings->sharkVibrateStart);
+  persist_write_int(KEY_SHARK_VIBRATE_END, settings->sharkVibrateEnd);
+}
+
+static void sendClockStyle() {
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+    return;
+  }
+  
+  Tuplet value = TupletInteger(KEY_CLOCK_24_HOUR, clock_is_24h_style() ? 1 : 0);
+  dict_write_tuplet(iter, &value);
+  dict_write_end(iter);
+  app_message_outbox_send();
+}
+
+static void sharkWarnTimerCallback(void *callback_data) {
+  _sharkWarnTimer = NULL;
+  vibes_short_pulse();
+}
+
+static void setSharkWarnTimer(SCENE scene, struct tm *tick_time) {
+  bool timerActive = (scene == FRIDAY13 && _settings.sharkVibrate == 1 &&
+                      isHourInRange(tick_time->tm_hour, _settings.sharkVibrateStart, _settings.sharkVibrateEnd) &&
+                      tick_time->tm_min == (SHARK_SCENE_EAT_MINUTE - 1) && tick_time->tm_sec <= SHARK_SCENE_WARN_SECOND);
+  
+  if (timerActive == false && _sharkWarnTimer != NULL) {
+    app_timer_cancel(_sharkWarnTimer);
+    _sharkWarnTimer = NULL;
+    
+  } else if (timerActive && _sharkWarnTimer == NULL) {
+    // Set the shark warn timer at the minute before shark eat minute
+    _sharkWarnTimer = app_timer_register((SHARK_SCENE_WARN_SECOND - tick_time->tm_sec) * 1000, (AppTimerCallback) sharkWarnTimerCallback, NULL);
+  }
+}
+
+static void messageTimerCallback(void *callback_data) {
+  _messageTimer = NULL;
+  if (_messageData != NULL) {
+    DestroyMessageLayer(_messageData);
+    _messageData = NULL;
+  }
+}
+
+static void showMessage(const char *text, uint32_t duration) {
+  if (_messageTimer != NULL) {
+    if (app_timer_reschedule(_messageTimer, duration) == false) {
+      _messageTimer = NULL;
+    }
+  } 
+  
+  if (_messageTimer == NULL) {
+    _messageTimer = app_timer_register(duration, messageTimerCallback, NULL);
+  }
+  
+  if (_messageData == NULL) {
+    _messageData = CreateMessageLayer(window_get_root_layer(_mainWindow), CHILD);
+  }
+  
+  DrawMessageLayer(_messageData, text);
+}
+
+static struct tm* getTime(struct tm *real_time) {
+struct tm *localTime;
+
 #ifdef RUN_TEST
   time_t now = TestUnitGetTime(_testUnitData); 
+  localTime = localtime(&now);
 #else
-  time_t now = time(NULL); 
+  if (real_time != NULL) {
+    localTime = real_time;
+    
+  } else {
+    time_t now = time(NULL);
+    localTime = localtime(&now);
+  }
 #endif
   
-  struct tm* localNow = localtime(&now);
-  uint16_t hour = localNow->tm_hour;
-  uint16_t minute = localNow->tm_min;
-  uint16_t second = localNow->tm_sec;
+  return localTime;
+}
+
+static void drawWatchFace(struct tm *tick_time) {
+  uint16_t hour = tick_time->tm_hour;
+  uint16_t minute = tick_time->tm_min;
+  uint16_t second = tick_time->tm_sec;
   
-  SCENE scene = getScene(localNow);
+  SCENE scene = getScene(tick_time);
   if (scene != _scene) {
     switchScene(scene);
   }
@@ -180,6 +519,10 @@ static void drawWatchFace() {
   DrawWavesLayer(_wavesData, hour, minute);
   
   drawScene(scene, hour, minute, second);
+  
+#ifndef RUN_TEST
+  setSharkWarnTimer(scene, tick_time);
+#endif
 }
 
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second) {
@@ -257,14 +600,18 @@ static void switchScene(SCENE scene) {
   _scene = scene;
 }
 
-static SCENE getScene(struct tm* now) {
-  if (now->tm_mon == 11 && now->tm_mday == 25) {
+static SCENE getScene(struct tm *tick_time) {
+  if (_settings.sceneOverride >= THANKSGIVING && _settings.sceneOverride <= FRIDAY13) {
+    return _settings.sceneOverride;
+  }
+  
+  if (tick_time->tm_mon == 11 && tick_time->tm_mday == 25) {
     return CHRISTMAS;
     
-  } else if (now->tm_wday == 5 && now->tm_mday == 13) {
+  } else if (tick_time->tm_wday == 5 && tick_time->tm_mday == 13) {
     return FRIDAY13;
     
-  } else if (now->tm_mon == 10 && now->tm_wday == 4 && (now->tm_mday >= 22 && now->tm_mday <= 28)) {
+  } else if (tick_time->tm_mon == 10 && tick_time->tm_wday == 4 && (tick_time->tm_mday >= 22 && tick_time->tm_mday <= 28)) {
     return THANKSGIVING;
   }
   

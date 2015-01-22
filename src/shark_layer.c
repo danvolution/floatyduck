@@ -2,12 +2,12 @@
 #include "shark_layer.h"
 
 #define FIRST_SHARK_PASS_MINUTE 20
-#define LAST_SHARK_PASS_MINUTE 50
 
 #define SHARK_LEFT_WIDTH 88
   
 // Have the shark pass under the duck by PASS_OFFSET_Y y coordinates.
 #define PASS_OFFSET_Y 15
+#define PASS_POST_EAT_OFFSET_Y -7
   
 // Control speed of eat animation. Units are milliseconds per coordinate X.
 #define EAT_ANIMATION_SPEED_FACTOR 30
@@ -34,13 +34,26 @@ typedef struct {
   GPoint endPoint;
 } SharkAnimation;
 
+/*
+static const uint32_t _jawsMusic[] = { 
+  500,   50,   250,   2200,   
+  500,   50,   250,   1200,   
+  500,   50,   250,   250,   
+  500,   50,   250,   250,   
+  175,   75,   175,   75,   
+  175,   75,   175,   75,
+  175,   75,   175,   75,   
+  175,   75,   175
+};
+*/
+
 static PropertyAnimation *_animation = NULL;
 static SharkAnimationType _animationType = SHARK_UNDEFINED;
 static AppTimer *_eatTimer = NULL;
 static EatStateMachine _eatState;
 
 static void runAnimation(SharkLayerData* data, SharkAnimation* sharkAnimation);
-static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay);
+static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool runNow, bool firstDisplay);
 static SharkAnimation* getEatAnimation(SharkLayerData *data);
 static void animationStoppedHandler(Animation *animation, bool finished, void *context);
 static void eatTimerCallback(void *callback_data);
@@ -71,13 +84,9 @@ void DrawSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16
   bool firstDisplay = (data->lastUpdateMinute == -1); 
   data->lastUpdateMinute = minute;
   
-  SharkAnimation *sharkAnimation = getSharkAnimation(data, minute, second, firstDisplay);
+  SharkAnimation *sharkAnimation = getSharkAnimation(data, minute, second, firstDisplay, firstDisplay);
   if (sharkAnimation != NULL && _animation == NULL) {
-    SetLayerHidden((Layer*) data->shark.layer, &data->hidden, false);
     runAnimation(data, sharkAnimation);
-	
-  } else if (_animation == NULL) {
-    SetLayerHidden((Layer*) data->shark.layer, &data->hidden, true);
   }
   
   // The duck layer is showing if watchface was loaded between 51:50 and 51:59, so hide it if
@@ -96,6 +105,22 @@ void DestroySharkLayer(SharkLayerData *data) {
     DestroyBitmapGroup(&data->shark);
     free(data);
   }  
+}
+
+void HandleTapSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16_t second) {
+  // Exit if animation or rotation already running
+  if (_animation != NULL) {
+    return;
+  }
+  
+  // Force animation on shake.
+  SharkAnimation *sharkAnimation = getSharkAnimation(data, minute, second, true, false);
+  if (sharkAnimation == NULL) {
+    return;
+  }
+
+  runAnimation(data, sharkAnimation);
+  free(sharkAnimation);
 }
 
 static void runAnimation(SharkLayerData *data, SharkAnimation *sharkAnimation) {
@@ -126,12 +151,12 @@ static void runAnimation(SharkLayerData *data, SharkAnimation *sharkAnimation) {
   }
 }
 
-static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay) {
+static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, uint16_t second, bool runNow, bool firstDisplay) {
   if (minute == SHARK_SCENE_EAT_MINUTE) {
     SharkAnimation *sharkAnimation = NULL;
     
     // Don't let eat animation run over into next minute.
-    if (second < 59 - ((SCREEN_WIDTH + SHARK_LEFT_WIDTH) * EAT_ANIMATION_SPEED_FACTOR / 1000)) {
+    if (second < (59 - ((SCREEN_WIDTH + SHARK_LEFT_WIDTH) * EAT_ANIMATION_SPEED_FACTOR / 1000))) {
       memset(&_eatState, 0, sizeof(EatStateMachine));
       _eatState.state = EAT_INITIAL;
       
@@ -144,17 +169,22 @@ static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, 
     return sharkAnimation;
   }
   
-  if (minute < FIRST_SHARK_PASS_MINUTE || minute > LAST_SHARK_PASS_MINUTE) {
+  if (minute < FIRST_SHARK_PASS_MINUTE) {
     return NULL;
   }
   
-  // Create animation every 5 minutes or if displaying for the first time.
-  if ((minute % 5 != 0) && (firstDisplay == false)) {
+  // Create animation every 5 minutes, if displaying for the first time, or on shake.
+  if ((minute % 5 != 0) && (runNow == false)) {
     return NULL;
   }
   
   // Don't do animation if it would run over into the eat minute.
   if (minute == (SHARK_SCENE_EAT_MINUTE - 1) && second >= (58 - (SHARK_ANIMATION_DURATION / 1000))) {
+    return NULL;
+  }
+  
+  // Don't do animation if it would run over into the next hour.
+  if (minute == 59 && second >= (58 - (SHARK_ANIMATION_DURATION / 1000))) {
     return NULL;
   }
   
@@ -166,7 +196,7 @@ static SharkAnimation* getSharkAnimation(SharkLayerData *data, uint16_t minute, 
   bool swimRight = (minute % 2 == 0);
   
   // Position shark PASS_OFFSET_Y below duck
-  int16_t coordinateY = WATER_TOP(minute) + PASS_OFFSET_Y;
+  int16_t coordinateY = WATER_TOP(minute) + ((minute > SHARK_SCENE_EAT_MINUTE) ? PASS_POST_EAT_OFFSET_Y : PASS_OFFSET_Y);
  
   sharkAnimation->type = SHARK_PASS;
   sharkAnimation->duration = SHARK_ANIMATION_DURATION;
@@ -196,7 +226,7 @@ static SharkAnimation* getEatAnimation(SharkLayerData *data) {
         newState.endPoint = GPoint(98, 10);
         
       } else {
-        // Duck has already flew away. Swim the whole width of the screen.
+        // Duck has already flown away. Swim the whole width of the screen.
         newState.endPoint = GPoint(0 - SHARK_LEFT_WIDTH, 36);
       }
     

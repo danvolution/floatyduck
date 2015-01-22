@@ -1,7 +1,19 @@
 {
-    "appKeys": {},
+    "appKeys": {
+        "KEY_BLUETOOTH_VIBRATE": 5,
+        "KEY_CLOCK_24_HOUR": 7,
+        "KEY_CURRENT_VERSION": 0,
+        "KEY_HOUR_VIBRATE": 2,
+        "KEY_HOUR_VIBRATE_END": 4,
+        "KEY_HOUR_VIBRATE_START": 3,
+        "KEY_INSTALLED_VERSION": 1,
+        "KEY_SCENE_OVERRIDE": 6,
+        "KEY_SHARK_VIBRATE": 8,
+        "KEY_SHARK_VIBRATE_END": 10,
+        "KEY_SHARK_VIBRATE_START": 9
+    },
     "capabilities": [
-        ""
+        "configurable"
     ],
     "companyName": "dansherbeck",
     "longName": "Floaty Duck",
@@ -179,7 +191,7 @@
     "shortName": "Floaty Duck",
     "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
     "versionCode": 1,
-    "versionLabel": "1.5",
+    "versionLabel": "1.6",
     "watchapp": {
         "watchface": true
     }

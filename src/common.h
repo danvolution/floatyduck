@@ -1,6 +1,7 @@
 #pragma once
 
 //#define RUN_TEST true
+//#define LOGGING_ON true
 
 #define SCREEN_WIDTH 144
 #define SCREEN_HEIGHT 168
@@ -18,6 +19,10 @@
 #define WATER_RISE_DURATION 500
 #define SHARK_SCENE_EAT_MINUTE 51
 
+// The second in the minute before SHARK_SCENE_EAT_MINUTE that the user is warned
+// with a vibrate that the shark is coming to eat Floaty Duck.
+#define SHARK_SCENE_WARN_SECOND 58
+
 // The last minute in the hour that Santa will fly. Otherwise he gets 
 // too close to the duck.
 #define LAST_SANTA_ANIMATION_MINUTE 30
@@ -31,9 +36,16 @@
 
 // Convert from minute to Y coordinate
 #define WATER_TOP(minute) (SCREEN_HEIGHT - (minute * 14 / 5))
+  
+#ifdef LOGGING_ON
+  #define MY_APP_LOG(level, fmt, args...)                                \
+    app_log(level, __FILE_NAME__, __LINE__, fmt, ## args)
+#else
+  #define MY_APP_LOG(level, fmt, args...)
+#endif
 
 typedef enum { CHILD, ABOVE_SIBLING, BELOW_SIBLING } LayerRelation;
-typedef enum { UNDEFINED_SCENE, CHRISTMAS, DUCK, FRIDAY13, THANKSGIVING } SCENE;
+typedef enum { UNDEFINED_SCENE, DUCK, THANKSGIVING, CHRISTMAS, FRIDAY13 } SCENE;
 
 typedef struct {
   BitmapLayer *layer;

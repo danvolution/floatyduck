@@ -9,6 +9,7 @@ typedef struct {
   int16_t lastUpdateMinute;
 } SharkLayerData;
 
-SharkLayerData* CreateSharkLayer(Layer* relativeLayer, LayerRelation relation, DuckLayerData* duckData);
-void DrawSharkLayer(SharkLayerData* data, uint16_t hour, uint16_t minute, uint16_t second);
-void DestroySharkLayer(SharkLayerData* data);
+SharkLayerData* CreateSharkLayer(Layer *relativeLayer, LayerRelation relation, DuckLayerData* duckData);
+void DrawSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16_t second);
+void DestroySharkLayer(SharkLayerData *data);
+void HandleTapSharkLayer(SharkLayerData *data, uint16_t hour, uint16_t minute, uint16_t second);

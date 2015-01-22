@@ -70,7 +70,7 @@ static DuckAnimation* getDiveAnimation(uint16_t minute);
 static DuckAnimation* getFlyInAnimation(uint16_t minute);
 static DuckAnimation* getFlyOutAnimation(uint16_t minute);
 static DISPLAY_ACTION getDisplayAction(DuckLayerData *data, uint16_t minute, uint16_t second, bool firstDisplay);
-static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute);
+static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute, uint32_t *flyInDelay);
 static uint32_t getDuckResourceId(uint16_t minute, SCENE scene);
 static bool isAnimationInProgress();
 static void disableAnimations(DuckAnimation *duckAnimation);
@@ -233,6 +233,7 @@ void SwitchSceneDuckLayer(DuckLayerData* data, SCENE scene) {
   }
   
   data->scene = scene;
+  data->lastUpdateMinute = -1;
 }
 
 void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uint16_t second) {
@@ -242,7 +243,8 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
   }
   
   int16_t flyInMinute = -1;
-  if (canDoFlyOut(data, minute, second, &flyInMinute)) {
+  uint32_t flyInDelay = 0;
+  if (canDoFlyOut(data, minute, second, &flyInMinute, &flyInDelay)) {
     DuckAnimation *duckAnimation = getFlyOutAnimation(minute);
     if (duckAnimation == NULL) {
       return;
@@ -252,6 +254,7 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
     data->exited = (flyInMinute == -1);
     if (flyInMinute >= 0) {
       data->flyInReturnMinute = flyInMinute;
+      data->flyInDelayAnimation = flyInDelay;
     }
     
     _animation = runAnimation(data, duckAnimation, minute);
@@ -473,8 +476,9 @@ static uint32_t getDuckResourceId(uint16_t minute, SCENE scene) {
   return resourceId;
 }
 
-static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute) {
+static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, int16_t *flyInMinute, uint32_t *flyInDelay) {
   *flyInMinute = -1;
+  *flyInDelay = FLY_OUT_IN_DELAY;
   
   // Check if duck already exited (eaten or got away) due to shark.
   if (data->exited) {
@@ -492,7 +496,7 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
   }
   
   // Calculate landing time
-  uint32_t landingMilliSecond = (second * 1000) + FLY_OUT_DURATION + FLY_OUT_IN_DELAY + FLY_IN_DURATION;
+  uint32_t landingMilliSecond = (second * 1000) + FLY_OUT_DURATION + *flyInDelay + FLY_IN_DURATION;
    
   if (data->scene == FRIDAY13) {
     // If shark eat duck minute, fly duck out with no fly in.
@@ -514,10 +518,10 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
     return false;
   }
   
-  // Don't fly out if landing occurs when water is rising. Also covers the case
-  // of the hour change when the duck already flies in at minute zero.
+  // Adjust landing time and fly in delay if landing occurs when water is rising.
   if (landingMilliSecond >= 59000 && landingMilliSecond < 61000) {
-    return false;
+    *flyInDelay += (61000 - landingMilliSecond);
+    landingMilliSecond = 61000;
   }
   
   *flyInMinute = (landingMilliSecond >= 60000) ? (minute + 1) % 60: minute;
@@ -656,7 +660,7 @@ static void flyOutFinishedTimerCallback(void *callback_data) {
     return;
   }
 
-  duckAnimation->delay = FLY_OUT_IN_DELAY;
+  duckAnimation->delay = data->flyInDelayAnimation;
   _animation = runAnimation(data, duckAnimation, data->flyInReturnMinute);
   free(duckAnimation);
 }
