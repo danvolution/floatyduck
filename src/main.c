@@ -26,7 +26,9 @@
 #define KEY_SHARK_VIBRATE_END 10
   
 #define MESSAGE_SETTINGS_DURATION 1500
-#define MESSAGE_BLUETOOTH_DURATION 8000
+#define MESSAGE_BLUETOOTH_DURATION 5000
+
+#define VIBES_SHORT_IGNORE_TAPS_TIME 2000
 
 typedef struct {
   int32_t currentVersion;
@@ -59,6 +61,7 @@ static SCENE _scene;
 static Settings _settings;
 static AppTimer *_messageTimer = NULL;
 static AppTimer *_sharkWarnTimer = NULL;
+static AppTimer *_ignoreTapTimer = NULL;
 
 // Message window strings
 static const char *_settingsReceivedMsg = "Settings received!";
@@ -84,11 +87,14 @@ static void sendClockStyle();
 static void showMessage(const char *text, uint32_t duration);
 static void messageTimerCallback(void *callback_data);
 static void sharkWarnTimerCallback(void *callback_data);
+static void ignoreTapTimerCallback(void *callback_data);
+static void updateApp(struct tm *tick_time);
 static void drawWatchFace(struct tm *tick_time);
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second);
 static SCENE getScene(struct tm *tick_time);
 static void switchScene(SCENE scene);
 static struct tm* getTime(struct tm *real_time);
+static void vibrate();
 
 int main(void) {
   init();
@@ -154,6 +160,11 @@ static void deinit() {
     _messageTimer = NULL;
   }
   
+  if (_ignoreTapTimer != NULL) {
+    app_timer_cancel(_ignoreTapTimer);
+    _ignoreTapTimer = NULL;
+  }
+  
 #ifdef RUN_TEST
   if (_testUnitData != NULL) {
     DestroyTestUnit(_testUnitData);
@@ -176,7 +187,7 @@ static void main_window_load(Window *window) {
   _waterData = CreateWaterLayer(window_get_root_layer(_mainWindow), CHILD);
   _wavesData = CreateWavesLayer(window_get_root_layer(_mainWindow), CHILD);
   
-  drawWatchFace(getTime(NULL));
+  updateApp(getTime(NULL));
 }
 
 static void main_window_unload(Window *window) {
@@ -215,19 +226,25 @@ static void main_window_unload(Window *window) {
 
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed) {
   struct tm *localNow = getTime(tick_time);
-  drawWatchFace(localNow);
+  updateApp(localNow);
   
 #ifndef RUN_TEST
   // Check for hourly vibrate
   if ((units_changed & HOUR_UNIT) != 0 && _settings.hourVibrate == 1 &&
       isHourInRange(localNow->tm_hour, _settings.hourVibrateStart, _settings.hourVibrateEnd)) {
     
-    vibes_short_pulse();
+    vibrate();
   }
 #endif
 }
 
 static void tap_handler(AccelAxisType axis, int32_t direction) {
+  // If the disable tap timer is active then we know we're in a period that
+  // taps should be ignored.
+  if (_ignoreTapTimer != NULL) {
+    return;
+  }
+  
   struct tm *localNow = getTime(NULL);
   uint16_t hour = localNow->tm_hour;
   uint16_t minute = localNow->tm_min;
@@ -325,7 +342,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     showMessage(_settingsReceivedMsg, MESSAGE_SETTINGS_DURATION);    
   }
   
-  drawWatchFace(getTime(NULL));
+  updateApp(getTime(NULL));
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
@@ -359,7 +376,7 @@ static void bluetooth_service_handler(bool connected) {
   if (connected == false) {
     showMessage(_bluetoothDisconnectMsg, MESSAGE_BLUETOOTH_DURATION);
     if (_settings.bluetoothVibrate) {
-      vibes_short_pulse(); 
+      vibrate(); 
     }
   }
 }
@@ -440,7 +457,7 @@ static void sendClockStyle() {
 
 static void sharkWarnTimerCallback(void *callback_data) {
   _sharkWarnTimer = NULL;
-  vibes_short_pulse();
+  vibrate();
 }
 
 static void setSharkWarnTimer(SCENE scene, struct tm *tick_time) {
@@ -466,6 +483,10 @@ static void messageTimerCallback(void *callback_data) {
   }
 }
 
+static void ignoreTapTimerCallback(void *callback_data) {
+  _ignoreTapTimer = NULL;
+}
+
 static void showMessage(const char *text, uint32_t duration) {
   if (_messageTimer != NULL) {
     if (app_timer_reschedule(_messageTimer, duration) == false) {
@@ -485,7 +506,7 @@ static void showMessage(const char *text, uint32_t duration) {
 }
 
 static struct tm* getTime(struct tm *real_time) {
-struct tm *localTime;
+  struct tm *localTime;
 
 #ifdef RUN_TEST
   time_t now = TestUnitGetTime(_testUnitData); 
@@ -501,6 +522,20 @@ struct tm *localTime;
 #endif
   
   return localTime;
+}
+
+static void vibrate() {
+  // Vibrations can trigger the tap handler, so ignore taps for a period of time.
+  _ignoreTapTimer = app_timer_register(VIBES_SHORT_IGNORE_TAPS_TIME, (AppTimerCallback) ignoreTapTimerCallback, NULL);
+  vibes_short_pulse(); 
+}
+
+static void updateApp(struct tm *tick_time) {
+  drawWatchFace(tick_time);
+  
+#ifndef RUN_TEST
+  setSharkWarnTimer(_scene, tick_time);
+#endif
 }
 
 static void drawWatchFace(struct tm *tick_time) {
@@ -519,10 +554,6 @@ static void drawWatchFace(struct tm *tick_time) {
   DrawWavesLayer(_wavesData, hour, minute);
   
   drawScene(scene, hour, minute, second);
-  
-#ifndef RUN_TEST
-  setSharkWarnTimer(scene, tick_time);
-#endif
 }
 
 static void drawScene(SCENE scene, uint16_t hour, uint16_t minute, uint16_t second) {

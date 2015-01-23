@@ -21,7 +21,7 @@
 
 // The second in the minute before SHARK_SCENE_EAT_MINUTE that the user is warned
 // with a vibrate that the shark is coming to eat Floaty Duck.
-#define SHARK_SCENE_WARN_SECOND 58
+#define SHARK_SCENE_WARN_SECOND 57
 
 // The last minute in the hour that Santa will fly. Otherwise he gets 
 // too close to the duck.

@@ -46,7 +46,7 @@ Pebble.addEventListener("showConfiguration",
                             consoleLog("Error sending 24-hour format request to Pebble");
                             showSettings();
                           }
-                         );
+    );
   }
 );
 
