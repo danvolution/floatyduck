@@ -1,4 +1,3 @@
-var INSTALLED_VERSION = 16;
 var CONSOLE_LOG = false;
 var _showConfiguration = false;
 
@@ -11,11 +10,19 @@ Pebble.addEventListener("ready",
 
 Pebble.addEventListener("appmessage",
   function(e) {
+    var message;
+    
     consoleLog("Event listener - appmessage");
+
+    if (typeof(e.payload.KEY_INSTALLED_VERSION) !== "undefined") {
+      localStorage.setItem("installedVersion", parseInt(e.payload.KEY_INSTALLED_VERSION));  
+      message = "Installed version is " + e.payload.KEY_INSTALLED_VERSION;
+      consoleLog(message);
+    }
 
     if (typeof(e.payload.KEY_CLOCK_24_HOUR) !== "undefined") {
       localStorage.setItem("clock24Hour", parseInt(e.payload.KEY_CLOCK_24_HOUR));  
-      var message = "24-hour is " + ((e.payload.KEY_CLOCK_24_HOUR == 1) ? "on" : "off");
+      message = "24-hour is " + ((e.payload.KEY_CLOCK_24_HOUR == 1) ? "on" : "off");
       consoleLog(message);
       
       if (_showConfiguration === true) {
@@ -30,20 +37,20 @@ Pebble.addEventListener("showConfiguration",
   function(e) {
     consoleLog("Event listener - showConfiguration");
     
-    // Request 24-hour format from watchface.
+    // Request setup info (clock format and installed version) from watchface.
     var dictionary = {
-      "KEY_CLOCK_24_HOUR" : 0
+      "KEY_REQUEST_SETUP_INFO" : 0
     };
 
     _showConfiguration = true;  
     Pebble.sendAppMessage(dictionary,
                           function(e) {
-                            consoleLog("24-hour format request successfully sent to Pebble");
+                            consoleLog("Setup info request successfully sent to Pebble");
                           },
                           function(e) {
-                            // Fetching clock format failed, so just show configuration page with default value.
+                            // Fetching setup info failed, so just show configuration page with default/saved values.
                             _showConfiguration = false;
-                            consoleLog("Error sending 24-hour format request to Pebble");
+                            consoleLog("Error sending setup info request to Pebble");
                             showSettings();
                           }
     );
@@ -65,7 +72,6 @@ Pebble.addEventListener("webviewclosed",
 
       var dictionary = {
         "KEY_CURRENT_VERSION" : parseInt(configuration.currentVersion),
-        "KEY_INSTALLED_VERSION" : parseInt(INSTALLED_VERSION),
         "KEY_HOUR_VIBRATE" : parseInt(configuration.hourVibrate),
         "KEY_HOUR_VIBRATE_START" : parseInt(configuration.hourVibrateStart),
         "KEY_HOUR_VIBRATE_END" : parseInt(configuration.hourVibrateEnd),
@@ -89,6 +95,7 @@ Pebble.addEventListener("webviewclosed",
 );
 
 function formatUrlVariables() {
+  var installedVersion = getLocalInt("installedVersion", 0);
   var hourVibrate = getLocalInt("hourVibrate", 0);
   var hourVibrateStart = getLocalInt("hourVibrateStart", 9);
   var hourVibrateEnd = getLocalInt("hourVibrateEnd", 18);
@@ -99,7 +106,7 @@ function formatUrlVariables() {
   var sharkVibrateStart = getLocalInt("sharkVibrateStart", 9);
   var sharkVibrateEnd = getLocalInt("sharkVibrateEnd", 18);
 	
-  return ("installedVersion=" + INSTALLED_VERSION + "&hourVibrate=" + hourVibrate + 
+  return ("installedVersion=" + installedVersion + "&hourVibrate=" + hourVibrate + 
           "&hourVibrateStart=" + hourVibrateStart + "&hourVibrateEnd=" + hourVibrateEnd + 
           "&bluetoothVibrate=" + bluetoothVibrate + "&sceneOverride=" + sceneOverride + 
           "&clock24Hour=" + clock24Hour + "&sharkVibrate=" + sharkVibrate + 
@@ -119,7 +126,7 @@ function saveSettings(settings) {
 }
 
 function showSettings() {
-  Pebble.openURL("http://www.sherbeck.com/pebble/floatyduck.html?" + formatUrlVariables());
+  Pebble.openURL("http://www.sherbeck.com/pebble/floatyduck-dev.html?" + formatUrlVariables());
 }
 
 function getLocalInt(name, defaultValue) {

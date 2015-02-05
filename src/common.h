@@ -2,6 +2,8 @@
 
 //#define RUN_TEST true
 //#define LOGGING_ON true
+  
+#define INSTALLED_VERSION 17
 
 #define SCREEN_WIDTH 144
 #define SCREEN_HEIGHT 168
@@ -45,7 +47,7 @@
 #endif
 
 typedef enum { CHILD, ABOVE_SIBLING, BELOW_SIBLING } LayerRelation;
-typedef enum { UNDEFINED_SCENE, DUCK, THANKSGIVING, CHRISTMAS, FRIDAY13 } SCENE;
+typedef enum { UNDEFINED_SCENE, DUCK, THANKSGIVING, CHRISTMAS, FRIDAY13, VALENTINES } SCENE;
 
 typedef struct {
   BitmapLayer *layer;
@@ -66,3 +68,4 @@ bool BitmapGroupSetBitmap(BitmapGroup *group, uint32_t imageResourceId);
 GRect RotBitmapGroupChangeBitmap(RotBitmapGroup *group, uint32_t imageResourceId);
 void DestroyBitmapGroup(BitmapGroup *group);
 void DestroyRotBitmapGroup(RotBitmapGroup *group);
+bool isBufferFull(uint16_t start, uint16_t end, uint16_t size);

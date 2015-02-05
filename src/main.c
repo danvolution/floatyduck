@@ -24,6 +24,7 @@
 #define KEY_SHARK_VIBRATE 8
 #define KEY_SHARK_VIBRATE_START 9
 #define KEY_SHARK_VIBRATE_END 10
+#define KEY_REQUEST_SETUP_INFO 11
   
 #define MESSAGE_SETTINGS_DURATION 1500
 #define MESSAGE_BLUETOOTH_DURATION 5000
@@ -32,7 +33,6 @@
 
 typedef struct {
   int32_t currentVersion;
-  int32_t installedVersion;
   int32_t hourVibrate;
   int32_t hourVibrateStart;
   int32_t hourVibrateEnd;
@@ -65,7 +65,6 @@ static AppTimer *_ignoreTapTimer = NULL;
 
 // Message window strings
 static const char *_settingsReceivedMsg = "Settings received!";
-static const char *_settingsReceivedNewVersionMsg = "Settings received.\nNew version available!";
 static const char *_bluetoothDisconnectMsg = "Bluetooth connection lost!";
 
 static void init();
@@ -83,7 +82,7 @@ static void loadSettings(Settings *settings);
 static void saveSettings(Settings *settings);
 static int32_t readPersistentInt(const uint32_t key, int32_t defaultValue);
 static bool isHourInRange(int16_t hour, int16_t start, int16_t end);
-static void sendClockStyle();
+static void sendSetupInfo();
 static void showMessage(const char *text, uint32_t duration);
 static void messageTimerCallback(void *callback_data);
 static void sharkWarnTimerCallback(void *callback_data);
@@ -253,11 +252,11 @@ static void tap_handler(AccelAxisType axis, int32_t direction) {
   if (_duckData != NULL) {
     HandleTapDuckLayer(_duckData, hour, minute, second);
   }
-    
+
   if (_santaData != NULL) {
     HandleTapSantaLayer(_santaData, hour, minute, second);
   }
-    
+
   if (_sharkData != NULL) {
     HandleTapSharkLayer(_sharkData, hour, minute, second);
   }
@@ -267,9 +266,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   Tuple *tuple = dict_read_first(iterator);
   
   // Check for 24-hour format request from phone.
-  if (tuple != NULL && tuple->key == KEY_CLOCK_24_HOUR) {
-    MY_APP_LOG(APP_LOG_LEVEL_INFO, "24-hour format request");
-    sendClockStyle();
+  if (tuple != NULL && tuple->key == KEY_REQUEST_SETUP_INFO) {
+    MY_APP_LOG(APP_LOG_LEVEL_INFO, "Setup info request");
+    sendSetupInfo();
     return;
   }
 
@@ -278,11 +277,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
       case KEY_CURRENT_VERSION:
         _settings.currentVersion = tuple->value->int32;
         MY_APP_LOG(APP_LOG_LEVEL_INFO, "Current version %i", (int) _settings.currentVersion);
-        break;
-      
-      case KEY_INSTALLED_VERSION:
-        _settings.installedVersion = tuple->value->int32;
-        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Installed version %i", (int) _settings.installedVersion);
         break;
       
       case KEY_HOUR_VIBRATE:
@@ -334,14 +328,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
   
   saveSettings(&_settings);
-  
-  if (_settings.currentVersion > _settings.installedVersion) {
-    showMessage(_settingsReceivedNewVersionMsg, MESSAGE_SETTINGS_DURATION);
-
-  } else {
-    showMessage(_settingsReceivedMsg, MESSAGE_SETTINGS_DURATION);    
-  }
-  
+  showMessage(_settingsReceivedMsg, MESSAGE_SETTINGS_DURATION);    
   updateApp(getTime(NULL));
 }
 
@@ -357,6 +344,10 @@ static void outbox_sent_callback(DictionaryIterator *values, void *context) {
         // Record the most recently sent clock format
         persist_write_int(KEY_CLOCK_24_HOUR, tuple->value->int32);
         MY_APP_LOG(APP_LOG_LEVEL_INFO, "Successfully sent clock format %i to phone", (int) tuple->value->int32);
+        break;
+      
+      case KEY_INSTALLED_VERSION:
+        MY_APP_LOG(APP_LOG_LEVEL_INFO, "Successfully sent installed version %i to phone", (int) tuple->value->int32);
         break;
       
       default:
@@ -383,7 +374,6 @@ static void bluetooth_service_handler(bool connected) {
 
 static void loadSettings(Settings *settings) {
   settings->currentVersion = readPersistentInt(KEY_CURRENT_VERSION, 0);
-  settings->installedVersion = readPersistentInt(KEY_INSTALLED_VERSION, 0);
   settings->hourVibrate = readPersistentInt(KEY_HOUR_VIBRATE, 0);
   settings->hourVibrateStart = readPersistentInt(KEY_HOUR_VIBRATE_START, 9);
   settings->hourVibrateEnd = readPersistentInt(KEY_HOUR_VIBRATE_END, 18);
@@ -393,9 +383,7 @@ static void loadSettings(Settings *settings) {
   settings->sharkVibrateStart = readPersistentInt(KEY_SHARK_VIBRATE_START, 9);
   settings->sharkVibrateEnd = readPersistentInt(KEY_SHARK_VIBRATE_END, 18);
   
-  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: currentVersion=%i, installedVersion=%i",
-             (int) settings->currentVersion, (int) settings->installedVersion);
-  
+  MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: currentVersion=%i", (int) settings->currentVersion);
   MY_APP_LOG(APP_LOG_LEVEL_INFO, "Load settings: hourVibrate=%i, Start=%i, End=%i",
              (int) settings->hourVibrate, (int) settings->hourVibrateStart, (int) settings->hourVibrateEnd);
   
@@ -430,7 +418,6 @@ static bool isHourInRange(int16_t hour, int16_t start, int16_t end) {
 
 static void saveSettings(Settings *settings) {
   persist_write_int(KEY_CURRENT_VERSION, settings->currentVersion);
-  persist_write_int(KEY_INSTALLED_VERSION, settings->installedVersion);
   persist_write_int(KEY_HOUR_VIBRATE, settings->hourVibrate);
   persist_write_int(KEY_HOUR_VIBRATE_START, settings->hourVibrateStart);
   persist_write_int(KEY_HOUR_VIBRATE_END, settings->hourVibrateEnd);
@@ -441,7 +428,7 @@ static void saveSettings(Settings *settings) {
   persist_write_int(KEY_SHARK_VIBRATE_END, settings->sharkVibrateEnd);
 }
 
-static void sendClockStyle() {
+static void sendSetupInfo() {
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
 
@@ -449,8 +436,10 @@ static void sendClockStyle() {
     return;
   }
   
-  Tuplet value = TupletInteger(KEY_CLOCK_24_HOUR, clock_is_24h_style() ? 1 : 0);
-  dict_write_tuplet(iter, &value);
+  Tuplet clock24Hour = TupletInteger(KEY_CLOCK_24_HOUR, clock_is_24h_style() ? 1 : 0);
+  dict_write_tuplet(iter, &clock24Hour);
+  Tuplet installedVersion = TupletInteger(KEY_INSTALLED_VERSION, INSTALLED_VERSION);
+  dict_write_tuplet(iter, &installedVersion);
   dict_write_end(iter);
   app_message_outbox_send();
 }
@@ -577,21 +566,19 @@ static void switchScene(SCENE scene) {
   
   switch (scene) {
     case CHRISTMAS:
-      santaLayer = true;
       duckLayer = true;
+      santaLayer = true;
       break;
     
     case DUCK:
+    case THANKSGIVING:
+    case VALENTINES:
       duckLayer = true;
       break;
     
     case FRIDAY13:
       duckLayer = true;
       sharkLayer = true;
-      break;
-    
-    case THANKSGIVING:
-      duckLayer = true;
       break;
     
     default:
@@ -632,7 +619,7 @@ static void switchScene(SCENE scene) {
 }
 
 static SCENE getScene(struct tm *tick_time) {
-  if (_settings.sceneOverride >= THANKSGIVING && _settings.sceneOverride <= FRIDAY13) {
+  if (_settings.sceneOverride >= THANKSGIVING && _settings.sceneOverride <= VALENTINES) {
     return _settings.sceneOverride;
   }
   

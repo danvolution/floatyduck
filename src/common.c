@@ -115,6 +115,14 @@ void DestroyRotBitmapGroup(RotBitmapGroup *group) {
   }
 }
 
+bool isBufferFull(uint16_t start, uint16_t end, uint16_t size) {
+  if ((end + 1) == start || (start == 0 && end == (size - 1))) {
+    return true;
+  }
+  
+  return false;
+}
+
 static uint16_t getImageHypotenuse(uint32_t imageResourceId) {
   uint16_t hypotenuse = 0;
   

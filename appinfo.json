@@ -7,6 +7,7 @@
         "KEY_HOUR_VIBRATE_END": 4,
         "KEY_HOUR_VIBRATE_START": 3,
         "KEY_INSTALLED_VERSION": 1,
+        "KEY_REQUEST_SETUP_INFO": 11,
         "KEY_SCENE_OVERRIDE": 6,
         "KEY_SHARK_VIBRATE": 8,
         "KEY_SHARK_VIBRATE_END": 10,
@@ -20,6 +21,11 @@
     "projectType": "native",
     "resources": {
         "media": [
+            {
+                "file": "images/heart_small.png",
+                "name": "IMAGE_HEART",
+                "type": "png"
+            },
             {
                 "file": "images/duck_taking_off.png",
                 "name": "IMAGE_DUCK_TAKING_OFF",
@@ -191,7 +197,7 @@
     "shortName": "Floaty Duck",
     "uuid": "0a56eddf-489b-4733-8bbc-b237d464bf8c",
     "versionCode": 1,
-    "versionLabel": "1.6",
+    "versionLabel": "1.7",
     "watchapp": {
         "watchface": true
     }

@@ -24,7 +24,6 @@ static uint16_t _bubbleEndIndex = 0;
 static void bubbleLayerUpdateProc(Layer *layer, GContext *ctx);
 static void bubbleTimerCallback(void *callback_data);
 static int16_t getBubbleWiggle(uint16_t size);
-static bool isBufferFull(uint16_t start, uint16_t end, uint16_t size);
 
 BubbleLayerData* CreateBubbleLayer(Layer* relativeLayer, LayerRelation relation) {
   BubbleLayerData* data = malloc(sizeof(BubbleLayerData));
@@ -158,12 +157,4 @@ static void bubbleTimerCallback(void *callback_data) {
 static int16_t getBubbleWiggle(uint16_t size) {
   uint16_t index = rand() % WIGGLE_COUNT;
   return _wiggles[index];
-}
-
-static bool isBufferFull(uint16_t start, uint16_t end, uint16_t size) {
-  if ((end + 1) == start || (start == 0 && end == (size - 1))) {
-    return true;
-  }
-  
-  return false;
 }

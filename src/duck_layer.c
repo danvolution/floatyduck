@@ -63,6 +63,7 @@ static int32_t _rotationAmount = 0;
 static int32_t _rotationIncrement = 0;
 static AppTimer *_flyInTimer = NULL;
 static AppTimer *_flyOutTimer = NULL;
+static AppTimer *_heartTimer = NULL;
 
 static PropertyAnimation* runAnimation(DuckLayerData *data, DuckAnimation *duckAnimation, uint16_t minute);
 static DuckAnimation* getAnimation(uint16_t minute, SCENE scene);
@@ -86,8 +87,10 @@ static void flyOutAnimationStopped(Animation *animation, bool finished, void *co
 static void flyInFinishedTimerCallback(void *callback_data);
 static void flyOutFinishedTimerCallback(void *callback_data);
 static void rotationTimerCallback(void *callback_data);
+static void heartTimerCallback(void *callback_data);
 static uint32_t calcDegreeDiff(int32_t startDegree, int32_t endDegree, bool rotateCW);
 static void addBubbles(DuckLayerData *data);
+static void addHearts(DuckLayerData *data);
 
 static DuckAnimation _duckDiveAnimation[DIVE_POSITIONS] = {
   { 
@@ -145,6 +148,10 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t
     DrawBubbleLayer(data->bubbleData, hour, minute);
   }
   
+  if (data->heartData != NULL) {
+    DrawHeartLayer(data->heartData, hour, minute);
+  }
+  
   // Exit if this minute has already been handled.
   if (data->lastUpdateMinute == minute) {
     return;
@@ -197,12 +204,24 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t
   if (isSharkSceneControl(data->scene, minute) == false) {
     SetLayerHidden((Layer*) data->duck.layer, &data->hidden, false);
   }
+  
+  // For Valentine's Day draw hearts on first display.
+  if (data->scene == VALENTINES && firstDisplay &&
+     ((minute == 59 && second >= BUBBLES_CUTOFF_SECOND) == false)) {
+    
+      _heartTimer = app_timer_register(FIRST_DISPLAY_ANIMATION_DELAY, (AppTimerCallback) heartTimerCallback, (void*) data);
+  }
 }
 
 void DestroyDuckLayer(DuckLayerData* data) {
   if (_rotationTimer != NULL) {
     app_timer_cancel(_rotationTimer);
     _rotationTimer = NULL;
+  }
+  
+  if (_heartTimer != NULL) {
+    app_timer_cancel(_heartTimer);
+    _heartTimer = NULL;
   }
   
   if (_flyInTimer != NULL) {
@@ -216,6 +235,11 @@ void DestroyDuckLayer(DuckLayerData* data) {
       data->bubbleData = NULL;
     }
     
+    if (data->heartData != NULL) {
+      DestroyHeartLayer(data->heartData);    
+      data->heartData = NULL;
+    }
+    
     DestroyRotBitmapGroup(&data->duck);
     free(data);
   }
@@ -223,6 +247,7 @@ void DestroyDuckLayer(DuckLayerData* data) {
 
 void SwitchSceneDuckLayer(DuckLayerData* data, SCENE scene) {
   bool bubbleLayer = (scene == CHRISTMAS || scene == DUCK);
+  bool heartLayer = (scene == VALENTINES);
   
   if (bubbleLayer == true && data->bubbleData == NULL) {
     data->bubbleData = CreateBubbleLayer((Layer*) data->duck.layer, ABOVE_SIBLING);
@@ -230,6 +255,14 @@ void SwitchSceneDuckLayer(DuckLayerData* data, SCENE scene) {
   } else if (bubbleLayer == false && data->bubbleData != NULL) {
     DestroyBubbleLayer(data->bubbleData);
     data->bubbleData = NULL;
+  }
+  
+  if (heartLayer == true && data->heartData == NULL) {
+    data->heartData = CreateHeartLayer((Layer*) data->duck.layer, ABOVE_SIBLING);
+    
+  } else if (heartLayer == false && data->heartData != NULL) {
+    DestroyHeartLayer(data->heartData);
+    data->heartData = NULL;
   }
   
   data->scene = scene;
@@ -261,8 +294,11 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
     free(duckAnimation);
     
   } else if ((minute == 59 && second >= BUBBLES_CUTOFF_SECOND) == false) {
-    // Don't add bubbles if hour is about to change.
+    // Don't add bubbles or hearts if hour is about to change.
     addBubbles(data);
+    if (data->heartData != NULL) {
+      _heartTimer = app_timer_register(10, (AppTimerCallback) heartTimerCallback, (void*) data);
+    }
   }
 }
 
@@ -437,6 +473,10 @@ static DISPLAY_ACTION getDisplayAction(DuckLayerData *data, uint16_t minute, uin
     return DISPLAY_DIVE;
   }
   
+  if (data->scene == VALENTINES) {
+    return DISPLAY_ANIMATION;
+  }
+  
   // At first display or minute zero check for fly-in animation
   if (firstDisplay || minute == 0) {
     
@@ -485,8 +525,8 @@ static bool canDoFlyOut(DuckLayerData *data, uint16_t minute, uint16_t second, i
     return false;
   }
   
-  // Turkeys don't fly (much)
-  if (data->scene == THANKSGIVING) {
+  // Turkeys don't fly (much) and we don't fly on Valentine's Day
+  if (data->scene == THANKSGIVING || data->scene == VALENTINES) {
     return false;
   }
   
@@ -601,7 +641,11 @@ static void moveAnimationStopped(Animation *animation, bool finished, void *cont
   _animation = NULL;
   
   if (finished) {
-    addBubbles((DuckLayerData*) context);
+    DuckLayerData *data = (DuckLayerData*) context;
+    addBubbles(data);
+    if (data->heartData != NULL && data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE) {
+      _heartTimer = app_timer_register(10, (AppTimerCallback) heartTimerCallback, (void*) data);
+    }
   }
 }
 
@@ -699,7 +743,11 @@ static uint32_t calcDegreeDiff(int32_t startDegree, int32_t endDegree, bool rota
 }
 
 static void addBubbles(DuckLayerData *data) {
-  if (data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE && data->bubbleData != NULL) {
+  if (data->bubbleData == NULL) {
+    return;
+  }
+  
+  if (data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE) {
     GRect frame = layer_get_frame((Layer*) data->duck.layer);
     GPoint centerPoint = grect_center_point(&frame);
     centerPoint.x += _bubbleOffset.w;
@@ -709,4 +757,31 @@ static void addBubbles(DuckLayerData *data) {
     AddBubble(data->bubbleData, centerPoint, 1, 3, 2);
     AddBubble(data->bubbleData, centerPoint, 2, 4, 4);
   }
+}
+
+static void heartTimerCallback(void *callback_data) {
+  _heartTimer = NULL;
+  addHearts((DuckLayerData*) callback_data);
+}
+
+static void addHearts(DuckLayerData *data) {
+  if (data->heartData == NULL) {
+    return;
+  }
+  
+  int16_t top = 0;
+  GRect frame = layer_get_frame((Layer*) data->duck.layer);
+  GPoint centerPoint = grect_center_point(&frame);
+  
+  if (data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE) {
+    centerPoint.x += _bubbleOffset.w;
+    centerPoint.y += _bubbleOffset.h;
+    top = WATER_TOP(data->lastUpdateMinute);
+  }
+  
+  AddHeart(data->heartData, centerPoint, GPoint(centerPoint.x, top), 30, 0);
+  AddHeart(data->heartData, centerPoint, GPoint(centerPoint.x - 12, top), 25, 500);
+  AddHeart(data->heartData, centerPoint, GPoint(centerPoint.x + 12, top), 25, 800);
+  AddHeart(data->heartData, centerPoint, GPoint(centerPoint.x - 8, top), 28, 900);
+  AddHeart(data->heartData, centerPoint, GPoint(centerPoint.x + 8, top), 28, 1200);
 }
