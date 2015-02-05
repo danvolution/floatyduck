@@ -126,7 +126,7 @@ function saveSettings(settings) {
 }
 
 function showSettings() {
-  Pebble.openURL("http://www.sherbeck.com/pebble/floatyduck.html?" + formatUrlVariables());
+  Pebble.openURL("http://www.sherbeck.com/pebble/floatyduck17.html?" + formatUrlVariables());
 }
 
 function getLocalInt(name, defaultValue) {
