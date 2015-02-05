@@ -26,10 +26,6 @@
       </div><!-- /header -->
 
       <div role="main" class="ui-content">
-        <div id="new_version_section" class="ui-bar ui-bar-a ui-corner-all" style="display:none;">
-          <p style="text-align:center;">New version available!</p>
-        </div>
-
         <div class="ui-field-contain">
           <label for="hour_vibrate_select">Quack on the hour:</label>
           <select id="hour_vibrate_select" data-role="flipswitch" data-mini="true">
@@ -108,6 +104,8 @@
                 <label for="christmas" id="christmas_label">Christmas</label>
                 <input type="radio" name="scene_override" id="friday13th" value="4" />
                 <label for="friday13th" id="friday13th_label">Friday the 13th</label>
+                <input type="radio" name="scene_override" id="valentines" value="5" />
+                <label for="valentines" id="valentines_label">Valentines Day</label>
               </fieldset>
             </div>
           </div>
@@ -133,7 +131,7 @@
     <script>    
       // The current release version of the app. Value is a unique integer that
       // is incremented on every release.
-      var CURRENT_VERSION = 16;
+      var CURRENT_VERSION = 17;
 
       var Scene = {
         undefinedScene : 0, 
@@ -141,6 +139,7 @@
         thanksgivingScene : 2,
         christmasScene : 3,
         friday13Scene : 4,
+        valentinesScene : 5
       };
 
       var Labels12Hour = [ "12:00 AM", "1:00 AM", "2:00 AM", "3:00 AM", "4:00 AM", "5:00 AM", "6:00 AM", "7:00 AM", 
@@ -152,13 +151,6 @@
                            "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00" ];
 
       $().ready(function() {
-        // Check for newer version
-        var installedVersion = getURLVariableInt("installedVersion", 0);
-        if (installedVersion > 0 && (CURRENT_VERSION > installedVersion)) {
-          var newVersionSection = document.getElementById("new_version_section");
-          newVersionSection.style.display = "block";
-        }
-
         // Get 24-hour clock format
         var clock24Hour = getURLVariableInt("clock24Hour", 0);
 
@@ -194,7 +186,7 @@
         // Initialize scene override
         var sceneOverride = getURLVariableInt("sceneOverride", Scene.undefinedScene);        
         var sceneLabel;
-        if (sceneOverride >= Scene.thanksgivingScene && sceneOverride <= Scene.friday13Scene) {
+        if (sceneOverride >= Scene.thanksgivingScene && sceneOverride <= Scene.valentinesScene) {
           // Turn scene switch on
           $("#scene_select").val("1");
           $("#scene_select").parent().addClass("ui-flipswitch-active");
@@ -207,6 +199,10 @@
 
             case Scene.friday13Scene:
               sceneLabel = "friday13th_label";
+              break;
+              
+            case Scene.valentinesScene:
+              sceneLabel = "valentines_label";
               break;
 
             case Scene.thanksgivingScene:
