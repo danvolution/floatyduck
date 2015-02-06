@@ -3,7 +3,7 @@
 //#define RUN_TEST true
 //#define LOGGING_ON true
   
-#define INSTALLED_VERSION 17
+#define INSTALLED_VERSION 18
 
 #define SCREEN_WIDTH 144
 #define SCREEN_HEIGHT 168

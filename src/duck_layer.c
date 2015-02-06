@@ -206,9 +206,7 @@ void DrawDuckLayer(DuckLayerData* data, uint16_t hour, uint16_t minute, uint16_t
   }
   
   // For Valentine's Day draw hearts on first display.
-  if (data->scene == VALENTINES && firstDisplay &&
-     ((minute == 59 && second >= BUBBLES_CUTOFF_SECOND) == false)) {
-    
+  if (data->heartData != NULL && firstDisplay && second < BUBBLES_CUTOFF_SECOND) {
       _heartTimer = app_timer_register(FIRST_DISPLAY_ANIMATION_DELAY, (AppTimerCallback) heartTimerCallback, (void*) data);
   }
 }
@@ -295,8 +293,10 @@ void HandleTapDuckLayer(DuckLayerData *data, uint16_t hour, uint16_t minute, uin
     
   } else if ((minute == 59 && second >= BUBBLES_CUTOFF_SECOND) == false) {
     // Don't add bubbles or hearts if hour is about to change.
-    addBubbles(data);
-    if (data->heartData != NULL) {
+    if (data->bubbleData != NULL) {
+      addBubbles(data);
+      
+    } else if (data->heartData != NULL && second < BUBBLES_CUTOFF_SECOND) {
       _heartTimer = app_timer_register(10, (AppTimerCallback) heartTimerCallback, (void*) data);
     }
   }
@@ -642,8 +642,10 @@ static void moveAnimationStopped(Animation *animation, bool finished, void *cont
   
   if (finished) {
     DuckLayerData *data = (DuckLayerData*) context;
-    addBubbles(data);
-    if (data->heartData != NULL && data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE) {
+    if (data->bubbleData != NULL) {
+      addBubbles(data);
+      
+    } else if (data->heartData != NULL && data->duck.resourceId == RESOURCE_ID_IMAGE_DUCK_DIVE) {
       _heartTimer = app_timer_register(10, (AppTimerCallback) heartTimerCallback, (void*) data);
     }
   }

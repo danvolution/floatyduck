@@ -3,10 +3,11 @@
 
 #define DEC_25_2014_00_00_00 1419465600
 #define FEB_13_2015_00_00_00 1423785600
+#define FEB_14_2015_00_00_00 1423872000
 #define NOV_27_2014_00_00_00 1417046400
 #define JAN_01_2015_00_00_00 1420070400
   
-#define TEST_COUNT 24
+#define TEST_COUNT 25
 
 typedef struct {
   time_t startTime;
@@ -65,10 +66,11 @@ TestUnitData* CreateTestUnit() {
     testIndex++;
 */    
 
-
+    //////////////////////////
     // Friday the 13th
+    //////////////////////////
     
-    // Run up to minute 0 and pause for fly-in
+    // Start at 5 minutes before, run up to minute 0, and pause for fly-in
     _testData[testIndex].startTime = FEB_13_2015_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 60;
     _testData[testIndex].stepCount = 5;
@@ -111,8 +113,20 @@ TestUnitData* CreateTestUnit() {
     _testData[testIndex].stepCount = 4;
     testIndex++;
 
-    // Christmas
+    //////////////////////////
+    // Valentine's Day
+    //////////////////////////
     
+    // Start at 5 minutes before the hour and run to 5 minutes past
+    _testData[testIndex].startTime = FEB_14_2015_00_00_00 - (5 * 60);
+    _testData[testIndex].stepSeconds = 60;
+    _testData[testIndex].stepCount = 70;
+    testIndex++;
+    
+    //////////////////////////
+    // Christmas
+    //////////////////////////
+      
     // Start at 5 minutes before the hour, run to 30 minutes past, 
     // increment by 5 minutes, and then pause to let animation run.
     for (int index = 0; index < 7; index++) {
@@ -136,22 +150,26 @@ TestUnitData* CreateTestUnit() {
     _testData[testIndex].stepCount = 4;
     testIndex++;
     
+    //////////////////////////
     // Thanksgiving
+    //////////////////////////
     
-    // Start at 5 minutes before the hour
+    // Start at 5 minutes before the hour and run to 5 minutes past
     _testData[testIndex].startTime = NOV_27_2014_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 60;
     _testData[testIndex].stepCount = 70;
     testIndex++;
-   
-    // Normal. Increment by 61 minutes so hour and minute changes.
+
+    //////////////////////////
+    // Normal - Increment by 61 minutes so hour and minute changes.
+    //////////////////////////
     
     // Start at 5 minutes before the hour and run to minute 0
     _testData[testIndex].startTime = JAN_01_2015_00_00_00 - (5 * 60);
     _testData[testIndex].stepSeconds = 3660;
     _testData[testIndex].stepCount = 5;
     _testData[testIndex].endPauseCount = 5;
-   testIndex++;
+    testIndex++;
     
     // Run to minute 0 and pause for fly-in
     _testData[testIndex].startTime = JAN_01_2015_00_00_00 + (1 * 60);

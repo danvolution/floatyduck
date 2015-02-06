@@ -8,6 +8,7 @@
 #include "shark_layer.h"
 #include "santa_layer.h"
 #include "message_layer.h"
+#include "status_layer.h"
   
 #ifdef RUN_TEST
 #include "test_unit.h"
@@ -52,6 +53,7 @@ static DuckLayerData* _duckData = NULL;
 static SharkLayerData* _sharkData = NULL;
 static SantaLayerData* _santaData = NULL;
 static MessageLayerData *_messageData = NULL;
+static StatusLayerData *_statusData = NULL;
 
 #ifdef RUN_TEST
 static TestUnitData* _testUnitData = NULL;
@@ -74,6 +76,7 @@ static void main_window_unload(Window *window);
 static void timer_handler(struct tm *tick_time, TimeUnits units_changed);
 static void tap_handler(AccelAxisType axis, int32_t direction);
 static void bluetooth_service_handler(bool connected);
+static void battery_service_handler(BatteryChargeState charge_state);
 static void inbox_received_callback(DictionaryIterator *iterator, void *context);
 static void inbox_dropped_callback(AppMessageResult reason, void *context);
 static void outbox_sent_callback(DictionaryIterator *values, void *context);
@@ -134,6 +137,9 @@ static void init() {
   // Register bluetooth service
   bluetooth_connection_service_subscribe(bluetooth_service_handler);
   
+  // Register battery service
+  battery_state_service_subscribe(battery_service_handler);
+  
   // Register AppMessage callbacks
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
@@ -146,6 +152,8 @@ static void init() {
 
 static void deinit() {
   vibes_cancel();
+  bluetooth_connection_service_unsubscribe();
+  battery_state_service_unsubscribe();
   accel_tap_service_unsubscribe();
   animation_unschedule_all();
   
@@ -182,9 +190,20 @@ static void main_window_load(Window *window) {
   
   // Fixed layers
   _markerData = CreateMarkerLayer(window_get_root_layer(_mainWindow), CHILD);
+  _statusData = CreateStatusLayer(window_get_root_layer(_mainWindow), CHILD);
   _hourData = CreateHourLayer(window_get_root_layer(_mainWindow), CHILD);
   _waterData = CreateWaterLayer(window_get_root_layer(_mainWindow), CHILD);
   _wavesData = CreateWavesLayer(window_get_root_layer(_mainWindow), CHILD);
+  
+  // Initialize Bluetooth status
+  bool connected = bluetooth_connection_service_peek();
+  ShowBluetoothStatus(_statusData, !connected);
+  UpdateBluetoothStatus(_statusData, connected);
+  
+  // Initialize battery status
+  BatteryChargeState batteryState = battery_state_service_peek();
+  ShowBatteryStatus(_statusData, (batteryState.is_charging || batteryState.is_plugged));
+  UpdateBatteryStatus(_statusData, batteryState);
   
   updateApp(getTime(NULL));
 }
@@ -218,6 +237,9 @@ static void main_window_unload(Window *window) {
   
   DestroyHourLayer(_hourData);
   _hourData = NULL;
+  
+  DestroyStatusLayer(_statusData);
+  _statusData = NULL;
   
   DestroyMarkerLayer(_markerData);
   _markerData = NULL;
@@ -370,6 +392,14 @@ static void bluetooth_service_handler(bool connected) {
       vibrate(); 
     }
   }
+  
+  ShowBluetoothStatus(_statusData, !connected);
+  UpdateBluetoothStatus(_statusData, connected);
+}
+
+static void battery_service_handler(BatteryChargeState charge_state) {
+  ShowBatteryStatus(_statusData, (charge_state.is_charging || charge_state.is_plugged));
+  UpdateBatteryStatus(_statusData, charge_state);
 }
 
 static void loadSettings(Settings *settings) {
@@ -538,6 +568,7 @@ static void drawWatchFace(struct tm *tick_time) {
   }
   
   DrawMarkerLayer(_markerData, hour, minute);
+  DrawStatusLayer(_statusData, hour, minute);
   DrawHourLayer(_hourData, hour, minute);
   DrawWaterLayer(_waterData, hour, minute);
   DrawWavesLayer(_wavesData, hour, minute);
@@ -619,12 +650,17 @@ static void switchScene(SCENE scene) {
 }
 
 static SCENE getScene(struct tm *tick_time) {
+#ifndef RUN_TEST
   if (_settings.sceneOverride >= THANKSGIVING && _settings.sceneOverride <= VALENTINES) {
     return _settings.sceneOverride;
   }
+#endif
   
   if (tick_time->tm_mon == 11 && tick_time->tm_mday == 25) {
     return CHRISTMAS;
+    
+  } else if (tick_time->tm_mon == 1 && tick_time->tm_mday == 14) {
+    return VALENTINES;
     
   } else if (tick_time->tm_wday == 5 && tick_time->tm_mday == 13) {
     return FRIDAY13;
